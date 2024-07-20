@@ -176,9 +176,53 @@ pub struct CreateOrderResponse {
     //JSAPI,APP 支付,小程序 预支付交易会话标识
     pub prepay_id: Option<String>,
     //NATIVE 支付链接
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub code_url: Option<String>,
     //h5下单支付跳转链接
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub h5_url: Option<String>,
+}
+/// 用于JSAPI 支付的签名数据
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct JsapiSignPackage {
+    //公众号ID
+    pub app_id: String,
+    //时间戳
+    pub time_stamp: String,
+    //随机字符串
+    pub nonce_str: String,
+    //统一下单返回的预支付交易会话标识
+    pub package: String,
+    //签名方式
+    pub sign_type: String,
+    //签名
+    pub pay_sign: String,
+}
+/// 用于app 支付的签名数据
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct AppSignPackage {
+    //应用ID
+    pub app_id: String,
+    //商户号
+    pub partner_id: String,
+    //统一下单返回的预支付交易会话标识
+    pub prepay_id: String,
+    // package value
+    pub package_value: String,
+    //随机字符串
+    pub nonce_str: String,
+    //时间戳
+    pub time_stamp: String,
+    //签名方式
+    pub sign: String,
+}
+/// 统一下单返回格式
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum CreateOrderResult {
+    Default(CreateOrderResponse),
+    JSAPI(JsapiSignPackage), 
+    APP(AppSignPackage)
 }
 // 错误返回详情 通常Status 4xx 5xx时返回
 ///错误返回方式以Json字符串方式返回

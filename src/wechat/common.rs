@@ -17,7 +17,7 @@ use crate::wechat::prelude::*;
 pub trait BaseTrait {
     /// 商户系统先调用该接口在微信支付服务后台生成预支付交易单，返回正确的预支付交易会话标识后再按Native、JSAPI、APP等不同场景生成交易串调起支付。
     #[allow(dead_code)]
-    fn create_order(&self,trade_type: TradeType,data: ReqOrderBody) -> impl Future<Output = Result<CreateOrderResponse,WeaError>>;
+    fn create_order(&self,trade_type: TradeType,data: ReqOrderBody) -> impl Future<Output = Result<CreateOrderResult,WeaError>>;
     /// 支付通知数据验证签名数据解密,验证签名的nonce_str,timestamp,signture 来自于请求头
     /// 解密nonce 来自于resource,根据返回结果中的event_type来判断
     /// 支付通知 U为ResourceOrderBody，退款通知 U为ResourceRefundBody
@@ -66,7 +66,7 @@ pub trait BaseTrait {
 }
 
 impl BaseTrait for Payment<WechatConfig> {
-    fn create_order(&self,trade_type: TradeType, data: ReqOrderBody) -> impl Future<Output = Result<CreateOrderResponse, WeaError>> {
+    fn create_order(&self,trade_type: TradeType, data: ReqOrderBody) -> impl Future<Output = Result<CreateOrderResult, WeaError>> {
         async move {
             let url = match trade_type {
                 TradeType::JSAPI => "/v3/pay/transactions/jsapi",
@@ -101,7 +101,45 @@ impl BaseTrait for Payment<WechatConfig> {
             let order_body = serde_json::to_string(&order_body)?;
         //print!("{}",order_body);
         
-            self.do_request::<CreateOrderResponse>(&url, "POST", &order_body).await
+            let rs = self.do_request::<CreateOrderResponse>(&url, "POST", &order_body).await?;
+            let prepay_id = rs.clone().prepay_id.unwrap();
+            let app_id = self.config.app_id.clone();
+            let time_stamp = get_timestamp().unwrap().to_string();
+            let nonce_str = generate_random_string(32);
+            let package = format!("prepay_id={}", prepay_id);
+            
+            match trade_type {
+                TradeType::JSAPI => {
+                    let pay_sign = self.generate_signature(vec![&app_id, &time_stamp, &nonce_str, &package]).unwrap();
+                    let sign_package = JsapiSignPackage{
+                        app_id,
+                        time_stamp,
+                        nonce_str,
+                        package,
+                        sign_type: "RSA".to_string(),
+                        pay_sign
+                    };
+                    Ok(CreateOrderResult::JSAPI(sign_package))
+                },
+              
+                TradeType::App => {
+                    
+                    let pay_sign = self.generate_signature(vec![&app_id, &time_stamp, &nonce_str, &prepay_id]).unwrap();
+                    let sign_package = AppSignPackage{
+                        app_id,
+                        partner_id: self.config.mchid.clone(),
+                        prepay_id,
+                        package_value: "Sign=WXPay".to_string(),
+                        nonce_str,
+                        time_stamp,
+                        sign: pay_sign
+                    };
+                    Ok(CreateOrderResult::APP(sign_package))
+                },
+                
+                _ => Ok(CreateOrderResult::Default(rs)),
+                
+            }
         }
  
     }
@@ -344,23 +382,7 @@ impl BaseTrait for Payment<WechatConfig> {
 mod tests {
     use tokio;
     use crate::wechat::prelude::*;
-    use crate::{generate_random_string,get_timestamp};
-    fn gen_jsapi_params(prepay_id: String) -> (){
-        let config = crate::tests::get_config();
-        let payment = super::Payment::new(config.clone());
-        let timestamp = get_timestamp().unwrap();
-        let nonce_str = generate_random_string(32);
-        let package = format!("prepay_id={}", &prepay_id);
-        let pay_sign = payment.generate_signature(vec![&config.app_id,timestamp.to_string().as_str(), nonce_str.as_str(), package.as_str()]).unwrap();
-        println!("
-        {{
-            \"timeStamp\":\"{}\",
-            \"nonceStr\": \"{}\",
-            \"package\": \"{}\",
-            \"signType\": \"RSA\",
-            \"paySign\": \"{}\"
-        }}",timestamp,nonce_str,package,pay_sign);
-    }
+ 
     //测试下单
     async fn test_create_order(trade_type:TradeType,body: ReqOrderBody) -> () {
         let config = crate::tests::get_config();
@@ -370,12 +392,10 @@ mod tests {
             let error  = result.err().unwrap();
             println!("{}", error);
         }else{
-            let result = result.unwrap();
-            if result.prepay_id.is_some() {
-                gen_jsapi_params(result.prepay_id.clone().unwrap());
-            }
-            assert_eq!(result.prepay_id.is_some(), true);
-            println!("{:?}", result);
+            let result = result;
+            let result_json = serde_json::to_string(&result.unwrap()).unwrap();
+            //assert_eq!(result.is_ok(), true);
+            println!("{:?}", result_json);
         }
         //result
     }
@@ -384,7 +404,7 @@ mod tests {
     async fn test_create_order_jsapi() {
         let data = ReqOrderBody{
             description: "旅行卡门票服务".to_string(),
-            out_trade_no: "T20240407004".to_string(),
+            out_trade_no: "T20240407005".to_string(),
             time_expire: Some("2024-08-01T00:00:00+08:00".to_string()),
             goods_tag: Some("WXG".to_string()),
             support_fapiao: Some(true),

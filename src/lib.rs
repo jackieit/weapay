@@ -117,7 +117,7 @@ pub mod tests {
     use std::env;
     #[test]
     fn test_generate_random_string() {
-        let now = SystemTime::now();
+       
         let mii = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
