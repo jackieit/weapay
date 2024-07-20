@@ -2,6 +2,8 @@
 wechat pay v3 and alipay rust pay
 支持微信支付和支付宝支付rust sdk，微信支付基于api v3
 包名称：weapay 意为 wechat pay & alipay
+目前仅在单过单元测试了普通商户的功能，服务商模式为测试
+支付宝支付还未开工
 # 微信签名验签
 1. 关于签名：微信支付签名规则参考[微信支付签名生成算法](https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_1.shtml)
 2. 关于验签：微信支付验签规则参考[微信支付验签](https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_2.shtml)
@@ -13,6 +15,7 @@ wechat pay v3 and alipay rust pay
 查看 [接入前准备](https://pay.weixin.qq.com/wiki/doc/apiv3/open/pay/chapter5_5_2.shtml#doc-main)
 服务商模式下,app_id = sub_appid, mchid = sub_mchid
 # Examples
+## 下单
 ```rust
 use weapay::{WechatConfig,Payment};
 use weapay::wechat::prelude::{ReqOrderBody,ReqAmountInfo,TradeType,BaseTrait};
@@ -34,5 +37,46 @@ let data = ReqOrderBody{
     //notify_url: "https://example.com".to_string(),
     ..Default::default()
 };
-//payment.create_order(TradeType::JSAPI, data).await
+let _result = payment.create_order(TradeType::JSAPI, data).await
 ```
+## 退款
+
+退款需要引入RefundTrait
+```rust
+use weapay::wechat::prelude::{ReqRefundOrder,ReqRefundAmountInfo,ReqRefundGoodsDetail,BaseTrait,RefundTrait};
+
+let payment = Payment::new(config);
+let data = ReqRefundOrder{
+    out_trade_no: Some("T20240407003".to_string()),
+    out_refund_no: "RT20240407003".to_string(),
+    reason: Some("商品已售完".to_string()),
+    amount: ReqRefundAmountInfo{
+        refund: 1,
+        total: 1,
+        currency: "CNY".to_string(),
+        ..Default::default()
+    },
+    goods_detail: Some(
+        vec![ReqRefundGoodsDetail{
+            merchant_goods_id: "11".to_string(),
+            goods_name: Some("旅行卡门票服务".to_string()),
+            unit_price: 1,
+            refund_amount: 1,
+            refund_quantity: 1,
+            ..Default::default()
+        }]
+    ),
+    ..Default::default()
+};
+let result = payment.refund(data).await;
+```
+
+## 查询对帐单
+需要引入 BillTrait
+```rust
+use weapay::wechat::prelude::BillTrait;
+let payment = Payment::new(config);
+let result = payment.trade_bill("2024-07-01".to_string(),Some("ALL".to_string()),None,false).await;
+```
+
+更多使用方法查看源码中测试方法
