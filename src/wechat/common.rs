@@ -76,7 +76,7 @@ impl BaseTrait for Payment<WechatConfig> {
                 _ => ""
             };
             if url.is_empty() {
-                return Err(WeaError::PayError(PayError::new("trade type error")));
+                return Err(e("trade type error"));
             }
             let url = self.get_uri(url,false,false);
             let mut order_body:ReqOrderBody;
@@ -147,7 +147,7 @@ impl BaseTrait for Payment<WechatConfig> {
         async move {
             let is_valid = self.validate_signature(vec![timestamp, nonce_str,  body], signature,serial).await?;
             if !is_valid {
-                return Err(WeaError::PayError(PayError::new("signature verify error")));
+                return Err(e("signature verify error"));
             }
             let notify_content = serde_json::from_str::<RespBody>(body)?;
             let nonce = notify_content.resource.nonce;
@@ -194,7 +194,7 @@ impl BaseTrait for Payment<WechatConfig> {
             let res:RespCert = self.do_request::<RespCert>(&url, "GET", "").await?;
             let data = res.data;
             if data.len() == 0 {
-                return Err(WeaError::PayError(PayError::new("certificates is empty")));
+                return Err(e("certificates is empty"));
             }
             let mut cert_files:Vec<String> = vec![];
             for item in data {
@@ -286,9 +286,9 @@ impl BaseTrait for Payment<WechatConfig> {
             } else {
                 let res = res.text().await?;
                 if res.is_empty() {
-                    return Err(WeaError::PayError(PayError::new(&status_code.to_string())));
+                    return Err(e(&status_code.to_string()));
                 }
-                return Err(WeaError::PayError(PayError::new(&res)));
+                return Err(e(&res));
             }
         }
     }
@@ -345,7 +345,7 @@ impl BaseTrait for Payment<WechatConfig> {
             let cert_files = self.download_cert().await?;
             let cert_file = cert_files.iter().find(|&x| x.contains(serial));
             if cert_file.is_none() {
-                return Err(WeaError::PayError(PayError::new("cert file not found")));
+                return Err(e("cert file not found"));
             }
             let cert_file = cert_file.unwrap();
             let apiclient_cert = fs::read_to_string(cert_file)?;
@@ -364,7 +364,7 @@ impl BaseTrait for Payment<WechatConfig> {
         let cipher = Aes256Gcm::new_from_slice(self.config.mch_key.as_bytes());
         let cipher = match cipher {
             Ok(cipher) => cipher,
-            Err(error) => return Err(WeaError::PayError(PayError::new(&format!("cipher error:{}",error)))),
+            Err(error) => return Err(e(&format!("cipher error:{}",error))),
         };
         let nonce = Nonce::from_slice(nonce.as_bytes());
         let ciphertext = decode_block(&ciphertext)?;

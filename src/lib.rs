@@ -109,7 +109,10 @@ pub fn get_timestamp() -> Result<u64,WeaError> {
     let timestamp = since_the_epoch.as_secs();
     Ok(timestamp)
 }
-
+// short for payerror
+pub fn e(message:&str) -> WeaError {
+    WeaError::PayError(error::PayError::new(message))
+}
 #[cfg(test)]
 pub mod tests {
     use std::{ collections::HashMap, time::{SystemTime,UNIX_EPOCH}};

@@ -42,7 +42,7 @@ impl BillTrait for Payment<WechatConfig> {
                 return Ok(resp);
             } else {
                 let res = resp.text().await?;
-                return Err(WeaError::PayError(PayError::new(&res)));
+                return Err(e(&res));
             } 
         }
     }
