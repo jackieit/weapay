@@ -184,6 +184,7 @@ pub struct CreateOrderResponse {
 }
 /// 用于JSAPI 支付的签名数据
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct JsapiSignPackage {
     //公众号ID
     pub app_id: String,
@@ -200,6 +201,7 @@ pub struct JsapiSignPackage {
 }
 /// 用于app 支付的签名数据
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSignPackage {
     //应用ID
     pub app_id: String,
