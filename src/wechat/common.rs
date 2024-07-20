@@ -11,7 +11,7 @@ use reqwest::Url;
 use serde::de::DeserializeOwned;
 use serde_json;
 use crate::*;
-use crate::error::{WeaError, PayError};
+use crate::error::WeaError;
 use crate::wechat::prelude::*;
 //微信支付trait
 pub trait BaseTrait {
@@ -205,15 +205,13 @@ impl BaseTrait for Payment<WechatConfig> {
                 let cert_path = format!("{}{}.pem",save_path,serial_no);
                 let cert_file  = path::Path::new(&cert_path);
                 if  cert_file.is_file()  {
-                    let metadata = fs::metadata(cert_file)?;
-                    let modify_time = metadata.modified()?;
-                    let mtime = modify_time.elapsed()?;
+                    let mtime = fs::metadata(cert_file)?
+                                            .modified()?
+                                            .elapsed()?;
                     if mtime < Duration::from_secs(12*3600) {
                         cert_files.push(cert_path);
                         continue;
                     }
-                    fs::create_dir_all(&save_path)?;
-                    
                 }
                 if !path::Path::new(&save_path).exists() {
                     fs::create_dir_all(&save_path)?;

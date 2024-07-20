@@ -2,7 +2,7 @@
 use std::future::Future;
 use crate::wechat::prelude::*;
 use crate::*;
-use crate::error::{WeaError, PayError};
+use crate::error::WeaError;
 pub trait BillTrait {
     /// 申请交易账单
     #[allow(dead_code)]
