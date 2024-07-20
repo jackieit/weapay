@@ -191,8 +191,8 @@ impl BaseTrait for Payment<WechatConfig> {
         let url = "/v3/certificates";
         let url = self.get_uri(url,false,false);
         async move {
-            let _res:RespCert = self.do_request::<RespCert>(&url, "GET", "").await?;
-            let data = _res.data;
+            let res:RespCert = self.do_request::<RespCert>(&url, "GET", "").await?;
+            let data = res.data;
             if data.len() == 0 {
                 return Err(WeaError::PayError(PayError::new("certificates is empty")));
             }
