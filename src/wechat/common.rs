@@ -1,7 +1,7 @@
 use std::{time::Duration,fs,path};
 use std::future::Future;
 use openssl::{
-    base64::{decode_block, encode_block}, hash::MessageDigest, pkey::PKey, rsa::Rsa, sign::{Signer, Verifier}, x509::X509
+    base64::decode_block, hash::MessageDigest, sign::Verifier, x509::X509
 };
 use aes_gcm::{
     Aes256Gcm,KeyInit,Nonce,
@@ -56,11 +56,9 @@ pub trait BaseTrait {
     /// widh_sp 是否带sp_mchid,服务商模式下为 sp_mchid,默认为false
     #[allow(dead_code)]
     fn get_uri(&self,uri: &str,with_mchid:bool,with_sp:bool) -> String;
-    /// 生成签名 data: vec!['GET', 'https://xxx', '1395712654', 'nonce_str', 'body'] 
-    fn generate_signature(&self,data: Vec<&str>) -> Result<String,WeaError>;
     /// 验证签名 
     /// data 为验证签名的数据  vec!['1395712654', 'nonce_str', 'body']
-    fn validate_signature(&self,data: Vec<&str>,signature:&str,serial:&str) -> impl Future<Output =  Result<bool, WeaError>>;
+    fn verify_signature(&self,data: Vec<&str>,signature:&str,serial:&str) -> impl Future<Output =  Result<bool, WeaError>>;
     /// 解密内容
     fn decrypt_content(&self,nonce: &str,ciphertext: &str,associated_data: &str) -> Result<String, WeaError>;
 }
@@ -110,7 +108,7 @@ impl BaseTrait for Payment<WechatConfig> {
             
             match trade_type {
                 TradeType::JSAPI => {
-                    let pay_sign = self.generate_signature(vec![&app_id, &time_stamp, &nonce_str, &package]).unwrap();
+                    let pay_sign = generate_signature(vec![&app_id, &time_stamp, &nonce_str, &package],&self.config.apiclient_key).unwrap();
                     let sign_package = JsapiSignPackage{
                         app_id,
                         time_stamp,
@@ -124,7 +122,7 @@ impl BaseTrait for Payment<WechatConfig> {
               
                 TradeType::App => {
                     
-                    let pay_sign = self.generate_signature(vec![&app_id, &time_stamp, &nonce_str, &prepay_id]).unwrap();
+                    let pay_sign = generate_signature(vec![&app_id, &time_stamp, &nonce_str, &prepay_id],&self.config.apiclient_key).unwrap();
                     let sign_package = AppSignPackage{
                         app_id,
                         partner_id: self.config.mchid.clone(),
@@ -145,7 +143,7 @@ impl BaseTrait for Payment<WechatConfig> {
     }
     fn notify<U:DeserializeOwned>(&self,nonce_str: &str,timestamp: &str,body: &str,signature:&str,serial:&str) -> impl Future<Output = Result<U,WeaError>> {
         async move {
-            let is_valid = self.validate_signature(vec![timestamp, nonce_str,  body], signature,serial).await?;
+            let is_valid = self.verify_signature(vec![timestamp, nonce_str,  body], signature,serial).await?;
             if !is_valid {
                 return Err(e("signature verify error"));
             }
@@ -241,7 +239,7 @@ impl BaseTrait for Payment<WechatConfig> {
         let timestamp = get_timestamp().unwrap().to_string();
         let nonce_str = generate_random_string(32);
         let sign_data = vec![method, url, &timestamp, &nonce_str, body];
-        let signature = self.generate_signature(sign_data).unwrap();
+        let signature = generate_signature(sign_data,&self.config.apiclient_key).unwrap();
         let mchid = if self.is_sp() {
             self.config.sp_mchid.clone().unwrap()
         } else {
@@ -317,25 +315,8 @@ impl BaseTrait for Payment<WechatConfig> {
             uri
         }
     }
-    // generate wechat v3 signature
-    fn generate_signature(&self, data: Vec<&str>) -> Result<String, WeaError> {
-        let data = data.join("\n");
-        let data = data + "\n";
-        //println!("签名数据====>\n{}",data);
-        let apiclient_key = self.config.apiclient_key.clone();
-        //println!("apiclient_key====>\n{}",apiclient_key);
-        let private_u8 = apiclient_key.as_bytes();
-        let rsa = Rsa::private_key_from_pem(private_u8)?;
-        let pkey = PKey::from_rsa(rsa)?;
-        let mut signer = Signer::new(MessageDigest::sha256(), &pkey)?;
-        //signer.set_rsa_padding(Padding::PKCS1).unwrap();
-        signer.update(data.as_bytes())?;
-        let sign = signer.sign_to_vec()?;
-    
-        Ok(encode_block(&sign))
-    }
-    // validate signature
-    fn validate_signature(&self, data: Vec<&str>, signature: &str, serial:&str) -> impl Future<Output = Result<bool, WeaError>> {
+    // verify signature
+    fn verify_signature(&self, data: Vec<&str>, signature: &str, serial:&str) -> impl Future<Output = Result<bool, WeaError>> {
         let data = data.join("\n");
         let data = data + "\n";
         async move {

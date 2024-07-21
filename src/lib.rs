@@ -8,6 +8,9 @@
 //! 3. 如果无法接收到异步通知请检查是否配置了正确的异步通知地址及设置了APIv3 密钥
 use std::{fmt::Debug, time::{SystemTime, UNIX_EPOCH}};
 use rand::{distributions::Alphanumeric, Rng};
+use openssl::{
+    base64::encode_block, hash::MessageDigest, pkey::PKey, rsa::Rsa, sign::Signer
+};
 use error::WeaError;
 pub mod wechat;
 pub mod alipay;
@@ -69,16 +72,12 @@ pub struct AlipayConfig {
     pub app_private_key: String,
     // 支付宝公钥
     pub alipay_public_key: String,
-    // 网关地址
-    //pub gateway: String,
-    // 签名类型
-    pub sign_type: Option<String>,
-    // 编码
-    pub charset: Option<String>,
+    // 公钥 serial 如果不传程序会自动获取
+    pub serial: Option<String>,
     // 异步通知地址
     pub notify_url: String,
-    // 返回格式
-    pub format: Option<String>,
+    // 沙盒模式
+    pub is_sandbox: bool,
 }
 
 // 支付配置
@@ -92,6 +91,21 @@ where
     pub fn new(config: T) -> Self {
         Payment { config }
     }
+}
+/// 生成签名 data: vec!['GET', 'https://xxx', '1395712654', 'nonce_str', 'body'] 
+/// private_key: 商户私钥
+fn generate_signature(data: Vec<&str>,private_key:&str) -> Result<String,WeaError> {
+    let data = data.join("\n");
+    let data = data + "\n";
+    let private_u8 = private_key.as_bytes();
+    let rsa = Rsa::private_key_from_pem(private_u8)?;
+    let pkey = PKey::from_rsa(rsa)?;
+    let mut signer = Signer::new(MessageDigest::sha256(), &pkey)?;
+    //signer.set_rsa_padding(Padding::PKCS1).unwrap();
+    signer.update(data.as_bytes())?;
+    let sign = signer.sign_to_vec()?;
+
+    Ok(encode_block(&sign))
 }
 // generate a random string
 pub fn generate_random_string(len: usize) -> String {
@@ -108,6 +122,13 @@ pub fn get_timestamp() -> Result<u64,WeaError> {
     let since_the_epoch = start.duration_since(UNIX_EPOCH)?;
     let timestamp = since_the_epoch.as_secs();
     Ok(timestamp)
+}
+// 获取当前 Unix 时间戳的毫秒数
+pub fn get_timestamp_millis() -> Result<u128, WeaError> {
+    let start = SystemTime::now();
+    let since_the_epoch = start.duration_since(UNIX_EPOCH)?;
+    let timestamp_millis = since_the_epoch.as_millis();
+    Ok(timestamp_millis)
 }
 // short for payerror
 pub fn e(message:&str) -> WeaError {
