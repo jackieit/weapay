@@ -70,10 +70,12 @@ pub struct AlipayConfig {
     pub app_id: String,
     // 应用私钥
     pub app_private_key: String,
+    // 应用app_cert_sn
+    pub app_cert_sn: String,
     // 支付宝公钥
     pub alipay_public_key: String,
     // 公钥 serial 如果不传程序会自动获取
-    pub serial: Option<String>,
+    pub alipay_cert_sn: String,
     // 异步通知地址
     pub notify_url: String,
     // 沙盒模式

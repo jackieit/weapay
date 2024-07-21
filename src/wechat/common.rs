@@ -44,7 +44,7 @@ pub trait BaseTrait {
     fn download_cert(&self) -> impl Future<Output = Result<Vec<String>,WeaError>>;
     /// 构建请求client 同时设置好请求头
     #[allow(dead_code)]
-    fn build_request_builder(&self,url: &str,method: &str,body: &str) -> reqwest::RequestBuilder;
+    fn build_request_builder(&self,url: &str,method: &str,body: &str) -> Result<reqwest::RequestBuilder,WeaError>;
     /// 发起请求同时会根据传入的类型返回对应的结果
     #[allow(dead_code)]
     fn do_request<U:DeserializeOwned>(&self,url: &str,method: &str,body: &str) -> impl Future<Output= Result<U, WeaError>>;
@@ -232,14 +232,14 @@ impl BaseTrait for Payment<WechatConfig> {
         }
     }
     /// build request client
-    fn build_request_builder(&self,url: &str,method: &str,body: &str) -> reqwest::RequestBuilder {
+    fn build_request_builder(&self,url: &str,method: &str,body: &str) -> Result<reqwest::RequestBuilder, WeaError> {
         let base_url = Url::parse("https://api.mch.weixin.qq.com/").unwrap();
         let full_url = base_url.join(url).unwrap();
         let full_url = full_url.as_str();
         let timestamp = get_timestamp().unwrap().to_string();
         let nonce_str = generate_random_string(32);
         let sign_data = vec![method, url, &timestamp, &nonce_str, body];
-        let signature = generate_signature(sign_data,&self.config.apiclient_key).unwrap();
+        let signature = generate_signature(sign_data,&self.config.apiclient_key)?;
         let mchid = if self.is_sp() {
             self.config.sp_mchid.clone().unwrap()
         } else {
@@ -262,16 +262,19 @@ impl BaseTrait for Payment<WechatConfig> {
         } else {
             req_builder
         };
-        req_builder
+        let req_builder = req_builder
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .header("User-Agent", "Weapay rust sdk/0.1.0")
-            .header("Authorization", authorization)
+            .header("Authorization", authorization);
+        Ok(req_builder)
+        
     }
     // do request
     fn do_request<U:DeserializeOwned>(&self,url: &str,method: &str,body: &str) ->  impl Future<Output= Result<U, WeaError>> {
-        let req_builder = self.build_request_builder(url,method,body);
+       
         async move {
+            let req_builder = self.build_request_builder(url,method,body)?;
             let res = req_builder.send()
             .await?;
             let status_code = res.status();

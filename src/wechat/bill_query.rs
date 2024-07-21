@@ -34,8 +34,8 @@ impl BillTrait for Payment<WechatConfig> {
     }
     fn download(&self,download_url: &str) -> impl Future<Output = Result<reqwest::Response, WeaError>> {
         let download_url = download_url.replace("https://api.mch.weixin.qq.com", "");
-        let req_builder = self.build_request_builder(&download_url, "GET", "");
         async move {
+            let req_builder = self.build_request_builder(&download_url, "GET", "")?;
             let resp = req_builder.send().await?;
             let status_code = resp.status();
             if status_code.is_success(){

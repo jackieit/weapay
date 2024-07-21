@@ -260,32 +260,87 @@ pub struct ReqOrderBody{
     pub agreement_sign_params: Option<ReqSignParams>,
 }
 // 支付统一下单End
-
+//交易支付使用的资金渠道。
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ResTradeFundBill{
+    //交易使用的资金渠道
+    pub fund_channel: String,
+    //该支付工具类型所使用的金额
+    pub amount: String,
+    //渠道实际付款金额
+    pub real_amount: Option<String>,
+}
+//本交易支付时使用的所有优惠券信息
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ResVoucherDetail{
+    //券id
+    pub id: String,
+    //券名称
+    pub name: String,
+    //券类型
+    pub r#type: String,
+    //优惠金额
+    pub amount: String,
+    //商家出资
+    pub merchant_contribute: Option<String>,
+    //其他出资方出资金额
+    pub other_contribute: Option<String>,
+    //优惠说明
+    pub memo: Option<String>,
+    //券模板id
+    pub template_id: Option<String>,
+    //如果使用的这张券是用户购买的，则该字段代表用户在购买这张券时用户实际付款的金额
+    pub purchase_buyer_contribute: Option<String>,
+    //如果使用的这张券是用户购买的，则该字段代表用户在购买这张券时商户优惠的金额
+    pub purchase_merchant_contribute: Option<String>,
+    //如果使用的这张券是用户购买的，则该字段代表用户在购买这张券时平台优惠的金额
+    pub purchase_ant_contribute: Option<String>,
+}
 // 下单返回
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ResOrderBody{
     //支付宝交易号
-    pub trade_no: String,
+    pub trade_no: Option<String>,
     //商家订单号
-    pub out_trade_no: String,
+    pub out_trade_no: Option<String>,
+    //当前预下单请求生成的二维码码串 //二维码支付
+    pub qr_code: Option<String>,
+    //签名字符串 app支付 & 周期扣款
+    #[serde(rename(deserialize = "orderStr"))]
+    pub order_str: Option<String>,
+    //跳转页面数据 wap支付
+    #[serde(rename(deserialize = "pageRedirectionData"))]
+    pub page_redirection_data: Option<String>,
     //买家支付宝用户号
-    pub buyer_user_id: String,
+    pub buyer_logon_id: Option<String>,
     //交易状态
-    pub trade_status: String,
+    //pub trade_status: String,
     //总金额
-    pub total_amount: String,
+    pub total_amount: Option<String>,
     //实收金额
-    pub receipt_amount: String,
-    //买家支付金额
-    pub buyer_pay_amount: String,
+    pub receipt_amount: Option<String>,
+    //交易支付时间
+    pub gmt_payment: Option<String>,
+    //交易支付使用的资金渠道
+    pub fund_bill_list: Option<Vec<ResTradeFundBill>>,
+    //买家在支付宝的用户id
+    pub buyer_user_id: Option<String>,
+    //买家支付宝用户唯一标识 
+    pub buyer_open_id: Option<String>,
+    //商家优惠金额
+    pub mdiscount_amount: Option<String>,
+    //平台优惠金额
+    pub discount_amount: Option<String>,
+    //买家实付金额
+    pub buyer_pay_amount: Option<String>,
     //集分宝金额
-    pub point_amount: String,
-    //开票金额
-    pub invoice_amount: String,
-    //付款金额
-    pub pay_amount: String,
-    //集分宝金额
-    pub jfb_buyer_amount: String,
-    //集分宝退回金额
-    pub jfb_discount_amount: String,
+    pub point_amount: Option<String>,
+    //交易中可给用户开具发票的金额
+    pub invoice_amount: Option<String>,
+    //发生支付交易的商户门店名称
+    pub store_name: Option<String>,
+    //本次交易支付所使用的单品券优惠的商品优惠信息
+    pub discount_goods_detail: Option<String>,
+    //本交易支付时使用的所有优惠券信息
+    pub voucher_detail_list: Option<ResVoucherDetail>,
 }
