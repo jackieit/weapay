@@ -140,7 +140,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         let req_builder = req_builder
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
-            .header("User-Agent", "Weapay rust sdk/0.1.0")
+            .header("User-Agent", SDK_UA)
             .header("alipay-request-id", request_id)
             .header("alipay-root-cert-sn", alipay_root_serial_no)
             .header("Authorization", authorization);
@@ -203,11 +203,15 @@ impl BaseTrait for Payment<AlipayConfig> {
         }
 
         let mch_key = decode_block(&mch_key.unwrap())?;
+        let mch_key = mch_key.as_slice();
+        //let mch_key = GenericArray::clone_from_slice(&mch_key);
         let cipher = Aes128::new_from_slice(&mch_key).map_err(|_e| e("Aes128 loadkey error"))?;
         //let key = GenericArray::from(mch_key);
         //let cipher = Aes128::new(&mch_key);
+    
         let mut block = GenericArray::clone_from_slice(data.as_bytes());
         cipher.encrypt_block(&mut block);
+         
         Ok(encode_block(&block))
     }
     //decrypt
@@ -225,4 +229,24 @@ impl BaseTrait for Payment<AlipayConfig> {
         cipher.decrypt_block(&mut block);
         Ok(block.iter().map(|&x| x as char).collect())
     }
+}
+
+
+#[cfg(test)]
+mod tests{
+  use crate::*;
+  use super::BaseTrait;
+  //test aes encrypt and decrypt
+  #[test]
+  fn test_aes_encrypt_decrypt(){
+    
+    let config = AlipayConfig{
+      mch_key: Some("7AU0S1ELkyNF9KZiVvQHIg==".to_string()),
+      ..Default::default()};
+    let payment = Payment::<AlipayConfig>::new(config);
+    let data = "hello world";
+    let encrypt_data = payment.encrypt(data).unwrap();
+    let decrypt_data = payment.decrypt(&encrypt_data).unwrap();
+    assert_eq!(data,decrypt_data);
+  }
 }

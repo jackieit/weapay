@@ -15,6 +15,8 @@ use error::WeaError;
 pub mod wechat;
 pub mod alipay;
 pub mod error;
+// reqwest 请求 user-agent
+const SDK_UA: &str = "Weapay rust sdk/0.1.0";
 /// 微信支付配置
 /// 查看 [接入前准备](https://pay.weixin.qq.com/wiki/doc/apiv3/open/pay/chapter5_5_2.shtml#doc-main)
 /// 服务商模式下,app_id = sub_appid, mchid = sub_mchid

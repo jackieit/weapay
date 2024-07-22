@@ -266,7 +266,7 @@ impl BaseTrait for Payment<WechatConfig> {
         let req_builder = req_builder
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
-            .header("User-Agent", "Weapay rust sdk/0.1.0")
+            .header("User-Agent", SDK_UA)
             .header("Authorization", authorization);
         Ok(req_builder)
         
