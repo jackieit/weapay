@@ -14,3 +14,9 @@ pub use super::dict::order::ReqOrderBody;
 
 // 下单返回
 pub use super::dict::order::ResOrderBody;
+
+// 异步通知
+pub use super::dict::notify::NotifyFundBill;
+pub use super::dict::notify::NotifyOtherContributeDetail;
+pub use super::dict::notify::NotifyVoucherDetail;
+pub use super::dict::notify::NotifyOrderBody;

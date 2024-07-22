@@ -233,8 +233,8 @@ impl BaseTrait for Payment<WechatConfig> {
     }
     /// build request client
     fn build_request_builder(&self,url: &str,method: &str,body: &str) -> Result<reqwest::RequestBuilder, WeaError> {
-        let base_url = Url::parse("https://api.mch.weixin.qq.com/").unwrap();
-        let full_url = base_url.join(url).unwrap();
+        let base_url = Url::parse("https://api.mch.weixin.qq.com/").map_err(|_e| e("parse url error"))?;
+        let full_url = base_url.join(url).map_err(|_e| e("Join url error"))?;
         let full_url = full_url.as_str();
         let timestamp = get_timestamp().unwrap().to_string();
         let nonce_str = generate_random_string(32);
@@ -245,10 +245,11 @@ impl BaseTrait for Payment<WechatConfig> {
         } else {
             self.config.mchid.clone()
         };
+        let serial_no = get_cert_serial(&self.config.apiclient_cert)?;
         let authorization = format!(
             "WECHATPAY2-SHA256-RSA2048 mchid=\"{}\",nonce_str=\"{}\",timestamp=\"{}\",serial_no=\"{}\",signature=\"{}\"", 
             mchid, nonce_str,timestamp, 
-            self.config.serial_no.clone(), signature );
+            serial_no, signature );
         let client = reqwest::Client::new();
         let req_builder = match method {
             "GET" => client.get(full_url),

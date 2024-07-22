@@ -24,11 +24,13 @@ pub mod error;
 /// use weapay::wechat::prelude::{ReqOrderBody,ReqAmountInfo,TradeType,BaseTrait};
 /// // 读取证书内容,注意apiclient_cert.pem 暂时没发现有什么用
 /// let apiclient_key = "C:\\Users\\Windows\\Desktop\\doc\\cert\\apiclient_key.pem";
-/// let key_content = std::fs::read_to_string(&apiclient_key).unwrap();
+/// let apiclient_cert = "C:\\Users\\Windows\\Desktop\\doc\\cert\\apiclient_cert.pem";
+/// //let key_content = std::fs::read_to_string(&apiclient_key).unwrap();
 /// let config = WechatConfig {
 ///     app_id: "wx123456".to_string(),
 ///     mch_key: "123456".to_string(),
-///     apiclient_key: key_content, 
+///     apiclient_key, 
+///     apiclient_cert,
 ///     ..Default::default()
 /// };
 /// let payment = Payment::new(config);
@@ -56,10 +58,10 @@ pub struct WechatConfig {
     pub mchid: String,
     // 商户支付密钥
     pub mch_key: String,
-    // 商户证书内容
+    // 商户证书内容文件路径
     pub apiclient_key: String,
-    // 商户证书序列号
-    pub serial_no: String,
+    // 商户证书内容文件路径
+    pub apiclient_cert: String,
     // 异步通知地址
     pub notify_url: String,
 }
@@ -68,14 +70,16 @@ pub struct WechatConfig {
 pub struct AlipayConfig {
     // 支付宝分配给开发者的应用ID
     pub app_id: String,
-    // 应用私钥
+    // 应用私钥文件路径
     pub app_private_key: String,
-    // 应用app_cert_sn
-    pub app_cert_sn: String,
-    // 支付宝公钥
-    pub alipay_public_key: String,
-    // 公钥 serial 如果不传程序会自动获取
-    pub alipay_cert_sn: String,
+    // 应用公钥文件路径
+    pub app_public_cert: String,
+    // 支付宝公钥文件路径
+    pub alipay_public_cert: String,
+    // 支付宝根证书文件路径
+    pub alipay_root_cert: String,
+    // 内容加密密钥
+    pub mch_key: Option<String>,
     // 异步通知地址
     pub notify_url: String,
     // 沙盒模式
@@ -95,11 +99,26 @@ where
     }
 }
 /// 生成签名 data: vec!['GET', 'https://xxx', '1395712654', 'nonce_str', 'body'] 
-/// private_key: 商户私钥
+/// private_key: 商户私钥,支付宝提供的私钥可能没有 begin-- end 手动加上。注意两端不要有空格
 fn generate_signature(data: Vec<&str>,private_key:&str) -> Result<String,WeaError> {
     let data = data.join("\n");
     let data = data + "\n";
-    let private_u8 = private_key.as_bytes();
+    let mut private_key_content = std::fs::read_to_string(private_key)?;
+    if !private_key_content.starts_with("-----BEGIN RSA PRIVATE KEY-----"){
+        let mut tmp_key_content = "-----BEGIN RSA PRIVATE KEY-----\n".to_string();
+        let mut line_length = 0;
+        for ch in private_key_content.chars() {
+            line_length = line_length + 1;
+            tmp_key_content.push(ch);
+            if line_length == 64 {
+                tmp_key_content = tmp_key_content + "\n";
+                line_length = 0;
+            }
+        }
+        tmp_key_content.push_str("\n-----END RSA PRIVATE KEY-----");
+        private_key_content = tmp_key_content;
+    }
+    let private_u8 = private_key_content.as_bytes();
     let rsa = Rsa::private_key_from_pem(private_u8)?;
     let pkey = PKey::from_rsa(rsa)?;
     let mut signer = Signer::new(MessageDigest::sha256(), &pkey)?;
@@ -136,6 +155,17 @@ pub fn get_timestamp_millis() -> Result<u128, WeaError> {
 pub fn e(message:&str) -> WeaError {
     WeaError::PayError(error::PayError::new(message))
 }
+// get cert serial number
+pub fn get_cert_serial(cert:&str) -> Result<String,WeaError> {
+
+    let cert = std::fs::read(cert)?;
+    let cert = openssl::x509::X509::stack_from_pem(&cert)?;
+    let cert = cert[0].serial_number().to_bn()?.to_hex_str()?.to_string();
+    // convert OpensslString to String
+    //let cert = cert.to_string();
+    //println!("get_cert_serial ==={}",cert);
+    Ok(cert)
+}
 #[cfg(test)]
 pub mod tests {
     use std::{ collections::HashMap, time::{SystemTime,UNIX_EPOCH}};
@@ -162,20 +192,22 @@ pub mod tests {
         let app_id = env_map.get("app_id").unwrap().to_string();
         let mch_key = env_map.get("mch_key").unwrap().to_string();
         let apiclient_key = env_map.get("apiclient_key").unwrap().to_string();
-        let key_content = std::fs::read_to_string(&apiclient_key).unwrap();
-        let serial_no = env_map.get("serial_no").unwrap().to_string();
+        let apiclient_cert = env_map.get("apiclient_cert").unwrap().to_string();
+        //let key_content = std::fs::read_to_string(&apiclient_key).unwrap();
+        //let serial_no = env_map.get("serial_no").unwrap().to_string();
         let notify_url = env_map.get("notify_url").unwrap().to_string();
         let mchid = env_map.get("mch_id").unwrap().to_string();
         let config = super::WechatConfig {
             app_id,
             mch_key,
-            apiclient_key: key_content,
-            serial_no,
+            apiclient_key,
+            apiclient_cert,
             notify_url,
             mchid,
             ..Default::default()
         };
         config
     }
+
 
 }

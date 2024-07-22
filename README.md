@@ -19,7 +19,7 @@ wechat pay v3 and alipay v3 rust pay
 ```rust
 use weapay::{WechatConfig,Payment};
 use weapay::wechat::prelude::{ReqOrderBody,ReqAmountInfo,TradeType,BaseTrait};
-// 读取证书内容,注意apiclient_cert.pem 暂时没发现有什么用
+// 无论是微信还是支付宝都需要传证书的文件绝对路径
 let apiclient_key = "C:\\Users\\Windows\\Desktop\\doc\\cert\\apiclient_key.pem";
 let key_content = std::fs::read_to_string(&apiclient_key).unwrap();
 let config = WechatConfig {
