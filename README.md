@@ -21,11 +21,13 @@ use weapay::{WechatConfig,Payment};
 use weapay::wechat::prelude::{ReqOrderBody,ReqAmountInfo,TradeType,BaseTrait};
 // 无论是微信还是支付宝都需要传证书的文件绝对路径
 let apiclient_key = "C:\\Users\\Windows\\Desktop\\doc\\cert\\apiclient_key.pem";
-let key_content = std::fs::read_to_string(&apiclient_key).unwrap();
+let apiclient_cert = "C:\\Users\\Windows\\Desktop\\doc\\cert\\apiclient_cert.pem";
+//let key_content = std::fs::read_to_string(&apiclient_key).unwrap();
 let config = WechatConfig {
     app_id: "wx123456".to_string(),
     mch_key: "123456".to_string(),
-    apiclient_key: key_content, 
+    apiclient_key, 
+    apiclient_cert,
     ..Default::default()
 };
 let payment = Payment::new(config);
