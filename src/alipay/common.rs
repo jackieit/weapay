@@ -1,5 +1,5 @@
-use aes::cipher::{generic_array::GenericArray, BlockDecrypt, BlockEncrypt, KeyInit};
-use aes::Aes128;
+use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
+
 use openssl::{
     base64::{decode_block, encode_block},
     hash::MessageDigest,
@@ -23,16 +23,15 @@ pub trait BaseTrait {
         &self,
         method: &str,
         data: ReqOrderBody,
-        with_aes: bool,
     ) -> impl Future<Output = Result<ResOrderBody, WeaError>>;
     /// 构建请求client 同时设置好请求头
+    /// 如果设置了mch_key 则会对body进行加密
     #[allow(dead_code)]
     fn build_request_builder(
         &self,
         url: &str,
         method: &str,
         body: &str,
-        with_aes: bool,
     ) -> Result<reqwest::RequestBuilder, WeaError>;
     /// 发起请求同时会根据传入的类型返回对应的结果
     #[allow(dead_code)]
@@ -41,7 +40,6 @@ pub trait BaseTrait {
         url: &str,
         method: &str,
         body: &str,
-        with_aes: bool,
     ) -> impl Future<Output = Result<U, WeaError>>;
     /// method format like alipay.trade.app.pay
     #[allow(dead_code)]
@@ -70,12 +68,11 @@ impl BaseTrait for Payment<AlipayConfig> {
         &self,
         method: &str,
         data: ReqOrderBody,
-        with_aes: bool,
     ) -> impl Future<Output = Result<ResOrderBody, WeaError>> {
         async move {
             let url = self.get_uri(method);
             let order_body = serde_json::to_string(&data)?;
-            self.do_request::<ResOrderBody>(&url, &"POST", &order_body, with_aes)
+            self.do_request::<ResOrderBody>(&url, &"POST", &order_body)
                 .await
         }
     }
@@ -91,7 +88,6 @@ impl BaseTrait for Payment<AlipayConfig> {
         url: &str,
         method: &str,
         body: &str,
-        with_aes: bool,
     ) -> Result<reqwest::RequestBuilder, WeaError> {
         let base_url = match self.config.is_sandbox {
             true => "https://openapi.alipay.com",
@@ -110,6 +106,7 @@ impl BaseTrait for Payment<AlipayConfig> {
             "app_id={},app_cert_sn={},nonce={},timestamp={}",
             &self.config.app_id, &app_serial_no, nonce_str, timestamp
         );
+        let with_aes = self.config.mch_key.is_some();
         let body = if with_aes {
             let body = self.encrypt(body)?;
             body
@@ -152,10 +149,9 @@ impl BaseTrait for Payment<AlipayConfig> {
         url: &str,
         method: &str,
         body: &str,
-        with_aes: bool,
     ) -> impl Future<Output = Result<U, WeaError>> {
         async move {
-            let req_builder = self.build_request_builder(url, method, body, with_aes)?;
+            let req_builder = self.build_request_builder(url, method, body)?;
             let res = req_builder.send().await?;
             let status_code = res.status();
             if status_code == 200 || status_code == 204 {
@@ -201,18 +197,20 @@ impl BaseTrait for Payment<AlipayConfig> {
         if mch_key.is_none() {
             return Err(e("mch_key is none"));
         }
-
         let mch_key = decode_block(&mch_key.unwrap())?;
         let mch_key = mch_key.as_slice();
-        //let mch_key = GenericArray::clone_from_slice(&mch_key);
-        let cipher = Aes128::new_from_slice(&mch_key).map_err(|_e| e("Aes128 loadkey error"))?;
-        //let key = GenericArray::from(mch_key);
-        //let cipher = Aes128::new(&mch_key);
-    
-        let mut block = GenericArray::clone_from_slice(data.as_bytes());
-        cipher.encrypt_block(&mut block);
-         
-        Ok(encode_block(&block))
+        type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
+        let iv = [0u8; 16];
+        let mut buf = [0u8; 48];
+        let data = data.as_bytes();
+        let pt_len = data.len();
+        buf[..pt_len].copy_from_slice(data);
+        let cipher =
+            Aes128CbcEnc::new_from_slices(mch_key, &iv).map_err(|_e| e("Aes128 loadkey error"))?;
+        let ct = cipher
+            .encrypt_padded_mut::<Pkcs7>(&mut buf, pt_len)
+            .map_err(|_e| e("padding error"))?;
+        Ok(encode_block(ct))
     }
     //decrypt
     fn decrypt(&self, data: &str) -> Result<String, WeaError> {
@@ -222,31 +220,41 @@ impl BaseTrait for Payment<AlipayConfig> {
         }
 
         let mch_key = decode_block(&mch_key.unwrap())?;
-        let cipher = Aes128::new_from_slice(&mch_key).map_err(|_e| e("Aes128 loadkey error"))?;
+        let mch_key = mch_key.as_slice();
+        type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
+        let iv = [0u8; 16];
 
         let data = decode_block(data)?;
-        let mut block = GenericArray::clone_from_slice(&data);
-        cipher.decrypt_block(&mut block);
-        Ok(block.iter().map(|&x| x as char).collect())
+        let data = data.as_slice();
+        let pt = Aes128CbcDec::new_from_slices(mch_key, &iv).unwrap();
+        let mut buf = [0u8; 48];
+        let pt = pt
+            .decrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf)
+            .map_err(|_e| e("unPading error"))?;
+        let pt = std::str::from_utf8(&pt).map_err(|_e| e("utf8 convert error"))?;
+        Ok(pt.to_string())
     }
 }
 
-
 #[cfg(test)]
-mod tests{
-  use crate::*;
-  use super::BaseTrait;
-  //test aes encrypt and decrypt
-  #[test]
-  fn test_aes_encrypt_decrypt(){
-    
-    let config = AlipayConfig{
-      mch_key: Some("7AU0S1ELkyNF9KZiVvQHIg==".to_string()),
-      ..Default::default()};
-    let payment = Payment::<AlipayConfig>::new(config);
-    let data = "hello world";
-    let encrypt_data = payment.encrypt(data).unwrap();
-    let decrypt_data = payment.decrypt(&encrypt_data).unwrap();
-    assert_eq!(data,decrypt_data);
-  }
+mod tests {
+    use super::BaseTrait;
+    use crate::*;
+    //test aes encrypt and decrypt
+    #[test]
+    fn test_aes_encrypt_decrypt() {
+        let key = openssl::base64::encode_block(b"1234567890123456");
+        println!("key=={}", key);
+        let config = AlipayConfig {
+            mch_key: Some(key.to_string()),
+            ..Default::default()
+        };
+        let payment = Payment::<AlipayConfig>::new(config);
+        let data = "hello world";
+        let encrypt_data = payment.encrypt(data).unwrap();
+        let decrypt_data = payment.decrypt(&encrypt_data).unwrap();
+        //println!("encrypt_data=={}",encrypt_data);
+        //println!("decrypt_data=={}",decrypt_data);
+        assert_eq!(data, decrypt_data);
+    }
 }
