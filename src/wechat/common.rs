@@ -11,6 +11,7 @@ use reqwest::Url;
 use serde::de::DeserializeOwned;
 use serde_json;
 use crate::*;
+use crate::utils::*;
 use crate::error::WeaError;
 use crate::wechat::prelude::*;
 //微信支付trait
@@ -358,7 +359,7 @@ mod tests {
  
     //测试下单
     async fn test_create_order(trade_type:TradeType,body: ReqOrderBody) -> () {
-        let config = crate::tests::get_config();
+        let config = crate::tests::get_config().0;
         let payment = super::Payment::new(config);
         let result = payment.create_order(trade_type, body).await;
         if result.is_err() {
@@ -465,7 +466,7 @@ mod tests {
     // 测试订单查询
     #[tokio::test]
     async fn test_query_order() {
-        let config = crate::tests::get_config();
+        let config = crate::tests::get_config().0;
         let payment = super::Payment::new(config);
         let result = payment.query_order("T20240407001").await;
         if result.is_err() {
@@ -491,7 +492,7 @@ mod tests {
     // 测试关闭订单
     #[tokio::test]
     async fn test_close_order() {
-        let config = crate::tests::get_config();
+        let config = crate::tests::get_config().0;
         let payment = super::Payment::new(config);
         let result = payment.close_order("2407020015").await;
         if result.is_err() {
@@ -504,7 +505,7 @@ mod tests {
     // 测试通知
     #[tokio::test]
     async fn test_notify() {
-        let config = crate::tests::get_config();
+        let config = crate::tests::get_config().0;
         let payment = super::Payment::new(config);
         let nonce_str = "wXGCUJV30xenmtIaT9sGPjcty2jova4n";
         let timestamp = "1721352091";
@@ -530,7 +531,7 @@ mod tests {
     // 测试下载证书
     #[tokio::test]
     async fn test_download_cert() {
-        let config = crate::tests::get_config();
+        let config = crate::tests::get_config().0;
         let payment = super::Payment::new(config);
         let result = payment.download_cert().await;
         if result.is_err() {

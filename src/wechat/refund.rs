@@ -53,7 +53,7 @@ mod tests {
     //use crate::wechat::prelude::*;
     #[tokio::test]
     async fn test_refund() {
-        let config = crate::tests::get_config();
+        let config = crate::tests::get_config().0;
         let payment = Payment::new(config);
         let data = ReqRefundOrder {
             out_trade_no: Some("T20240407003".to_string()),
@@ -88,7 +88,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_query_refund() {
-        let config = crate::tests::get_config();
+        let config = crate::tests::get_config().0;
         let payment = Payment::new(config);
         let out_refund_no = "RT20240407003";
         let result = payment.query_refund(out_refund_no).await;

@@ -1,5 +1,6 @@
 use crate::alipay::prelude::*;
 use crate::error::WeaError;
+use crate::utils::*;
 use crate::*;
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use openssl::{
@@ -179,12 +180,23 @@ impl BaseTrait for Payment<AlipayConfig> {
         let timestamp = get_timestamp_millis()?.to_string();
         let nonce_str = generate_random_string(32);
         let request_id = format!("{}{}", generate_random_string(10), timestamp);
-        let app_serial_no = get_cert_serial(&self.config.app_public_cert.clone())?;
-        let alipay_root_serial_no = get_cert_serial(&self.config.alipay_root_cert.clone())?;
-        let auth_string = format!(
-            "app_id={},app_cert_sn={},nonce={},timestamp={}",
-            &self.config.app_id, &app_serial_no, nonce_str, timestamp
-        );
+        let is_cert_model = self.config.alipay_root_cert.is_some();
+
+        //let alipay_root_serial_no = get_cert_serial(&self.config.alipay_root_cert.clone())?;
+        let auth_string = if is_cert_model {
+            let app_public_cert_sn =
+                get_cert_serial(&self.config.app_public_cert.clone().unwrap())?;
+            format!(
+                "app_id={},app_cert_sn={},nonce={},timestamp={}",
+                &self.config.app_id, &app_public_cert_sn, nonce_str, timestamp
+            )
+        } else {
+            format!(
+                "app_id={},nonce={},timestamp={}",
+                &self.config.app_id, nonce_str, timestamp
+            )
+        };
+
         let with_aes = self.config.mch_key.is_some();
         let body = if with_aes {
             let body = self.encrypt(body)?;
@@ -213,12 +225,19 @@ impl BaseTrait for Payment<AlipayConfig> {
         } else {
             req_builder
         };
+        let req_builder = if is_cert_model {
+            let alipay_root_serial_no =
+                get_cert_serial(&self.config.alipay_root_cert.clone().unwrap())?;
+            req_builder.header("alipay-root-cert-sn", alipay_root_serial_no)
+        } else {
+            req_builder
+        };
         let req_builder = req_builder
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .header("User-Agent", SDK_UA)
             .header("alipay-request-id", request_id)
-            .header("alipay-root-cert-sn", alipay_root_serial_no)
+            //.header("alipay-root-cert-sn", alipay_root_serial_no)
             .header("Authorization", authorization);
         Ok(req_builder)
     }
@@ -257,6 +276,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         //}
         // 加载公钥,公钥为文件内容
         let alipay_public_cert_content = fs::read_to_string(alipay_public_cert)?;
+        let alipay_public_cert_content = prepair_cert(alipay_public_cert_content, false);
         let app_cert = X509::from_pem(alipay_public_cert_content.as_bytes())?;
         let pkey = app_cert.public_key()?;
         //let data = data + "\n";
