@@ -85,7 +85,7 @@ pub struct AlipayConfig {
     // 异步通知地址
     pub notify_url: String,
     // 沙盒模式
-    pub is_sandbox: bool,
+    pub is_sandbox: Option<bool>,
 }
 
 // 支付配置

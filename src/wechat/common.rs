@@ -16,7 +16,6 @@ use crate::wechat::prelude::*;
 //微信支付trait
 pub trait BaseTrait {
     /// 商户系统先调用该接口在微信支付服务后台生成预支付交易单，返回正确的预支付交易会话标识后再按Native、JSAPI、APP等不同场景生成交易串调起支付。
-    #[allow(dead_code)]
     fn create_order(&self,trade_type: TradeType,data: ReqOrderBody) -> impl Future<Output = Result<CreateOrderResult,WeaError>>;
     /// 支付通知数据验证签名数据解密,验证签名的nonce_str,timestamp,signture 来自于请求头
     /// 解密nonce 来自于resource,根据返回结果中的event_type来判断
@@ -28,33 +27,24 @@ pub trait BaseTrait {
     /// payment.notify::<ResourceOrderBody>(nonce_str, timestamp, body, signature,serial).await?;
     /// let notify = self.notify::<ResourceRefundBody>(nonce_str, timestamp, body, signature,serial).await?;
     /// ```
-    #[allow(dead_code)]
     fn notify<U:DeserializeOwned>(&self,nonce_str: &str,timestamp: &str,body: &str,signature:&str,serial:&str) -> impl Future<Output = Result<U, WeaError>>;
     /// 根据商家订单号查询订单
-    #[allow(dead_code)]
     fn query_order(&self,out_trade_no: &str) -> impl Future<Output = Result<ResourceOrderBody,WeaError>>;
     /// 根据微信支付订单号查询订单
-    #[allow(dead_code)]
     fn query_order_by_transaction_id(&self,transaction_id: &str) -> impl Future<Output = Result<ResourceOrderBody, WeaError>>;
     /// 关闭订单
-    #[allow(dead_code)]
     fn close_order(&self,out_trade_no: &str) -> impl Future<Output = Result<(),WeaError>>;
     /// 下载证书
-    #[allow(dead_code)]
     fn download_cert(&self) -> impl Future<Output = Result<Vec<String>,WeaError>>;
     /// 构建请求client 同时设置好请求头
-    #[allow(dead_code)]
     fn build_request_builder(&self,url: &str,method: &str,body: &str) -> Result<reqwest::RequestBuilder,WeaError>;
     /// 发起请求同时会根据传入的类型返回对应的结果
-    #[allow(dead_code)]
     fn do_request<U:DeserializeOwned>(&self,url: &str,method: &str,body: &str) -> impl Future<Output= Result<U, WeaError>>;
-    #[allow(dead_code)]
     /// 判断是否是服务商模式
     fn is_sp(&self) -> bool;
     /// 获取请求uri服务商模式下uri前缀为/v3/pay/partner
     /// widh_mchid 是否带mchid,服务商模式下为 sub_mchid
     /// widh_sp 是否带sp_mchid,服务商模式下为 sp_mchid,默认为false
-    #[allow(dead_code)]
     fn get_uri(&self,uri: &str,with_mchid:bool,with_sp:bool) -> String;
     /// 验证签名 
     /// data 为验证签名的数据  vec!['1395712654', 'nonce_str', 'body']

@@ -26,7 +26,6 @@ pub trait BaseTrait {
     ) -> impl Future<Output = Result<ResOrderBody, WeaError>>;
     /// 构建请求client 同时设置好请求头
     /// 如果设置了mch_key 则会对body进行加密
-    #[allow(dead_code)]
     fn build_request_builder(
         &self,
         url: &str,
@@ -34,7 +33,6 @@ pub trait BaseTrait {
         body: &str,
     ) -> Result<reqwest::RequestBuilder, WeaError>;
     /// 发起请求同时会根据传入的类型返回对应的结果
-    #[allow(dead_code)]
     fn do_request<U: DeserializeOwned>(
         &self,
         url: &str,
@@ -42,7 +40,6 @@ pub trait BaseTrait {
         body: &str,
     ) -> impl Future<Output = Result<U, WeaError>>;
     /// method format like alipay.trade.app.pay
-    #[allow(dead_code)]
     fn get_uri(&self, method: &str) -> String;
     /// 验证签名
     /// data 为验证签名的数据  vec!['1395712654', 'nonce_str', 'body']
@@ -89,7 +86,8 @@ impl BaseTrait for Payment<AlipayConfig> {
         method: &str,
         body: &str,
     ) -> Result<reqwest::RequestBuilder, WeaError> {
-        let base_url = match self.config.is_sandbox {
+        let is_sandbox = self.config.is_sandbox.unwrap_or(false);
+        let base_url = match is_sandbox {
             true => "https://openapi.alipay.com",
             false => "https://openapi-sandbox.dl.alipaydev.com",
         };

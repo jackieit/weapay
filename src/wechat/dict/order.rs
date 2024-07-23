@@ -8,7 +8,7 @@ pub enum TradeType {
     App,
     MWEB,
     MICROPAY,
-    FACEPAY
+    FACEPAY,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -62,7 +62,6 @@ pub struct ReqOrderDetail {
     pub invoice_id: Option<String>,
     //商品单价
     pub goods_detail: Vec<ReqGoodsDetail>,
-
 }
 // 商户门店信息
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -109,10 +108,10 @@ pub struct ReqSceneInfo {
 }
 // 结算信息
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct ReqSettleInfo{
+pub struct ReqSettleInfo {
     //是否指定分账
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub profit_sharing:Option<bool>
+    pub profit_sharing: Option<bool>,
 }
 /// 统一下单请求体
 /// appid 与 mchid 为可选字段
@@ -146,7 +145,7 @@ pub struct ReqOrderBody {
     pub time_expire: Option<String>,
     //附加数据
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attach:Option<String>,
+    pub attach: Option<String>,
     //通知地址
     pub notify_url: Option<String>,
     //订单优惠标记
@@ -168,7 +167,7 @@ pub struct ReqOrderBody {
     pub scene_info: Option<ReqSceneInfo>,
     //结算信息
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub settle_info: Option<ReqSettleInfo>
+    pub settle_info: Option<ReqSettleInfo>,
 }
 ///统一下单返回体
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -223,8 +222,8 @@ pub struct AppSignPackage {
 #[serde(tag = "type")]
 pub enum CreateOrderResult {
     Default(CreateOrderResponse),
-    JSAPI(JsapiSignPackage), 
-    APP(AppSignPackage)
+    JSAPI(JsapiSignPackage),
+    APP(AppSignPackage),
 }
 // 错误返回详情 通常Status 4xx 5xx时返回
 ///错误返回方式以Json字符串方式返回
@@ -266,7 +265,7 @@ pub struct RespResource {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct RespSceneInfo {
     //商户端设备号
-    pub device_id: Option<String>
+    pub device_id: Option<String>,
 }
 // 支付通过数据体
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -283,7 +282,6 @@ pub struct RespBody {
     pub summary: String,
     //通知数据
     pub resource: RespResource,
-
 }
 // 支付通知resource amount
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -336,7 +334,6 @@ pub struct RespPromotionDetail {
     pub currency: Option<String>,
     //单品列表信息
     pub goods_detail: Vec<RespGoodsDetail>,
-
 }
 // 支付通知返回解密后内容
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -377,6 +374,5 @@ pub struct ResourceOrderBody {
     //支付场景描述
     pub scene_info: Option<RespSceneInfo>,
     //优惠标记
-    pub promotion_detail: Option<Vec<RespPromotionDetail>>
-    
+    pub promotion_detail: Option<Vec<RespPromotionDetail>>,
 }

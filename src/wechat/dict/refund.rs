@@ -32,7 +32,7 @@ pub struct ResourceRefundBody {
     //当前退款单的退款入账方
     pub user_received_account: String,
     //退款金额
-    pub amount: ResourceRefundAmount, 
+    pub amount: ResourceRefundAmount,
 }
 // 退款金额From
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -164,5 +164,4 @@ pub struct RefundResponse {
     pub amount: ReqRefundAmountInfo,
     //优惠退款信息
     pub promotion_detail: Vec<ReqRefundPromotionDetail>,
-
 }
