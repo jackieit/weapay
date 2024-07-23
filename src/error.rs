@@ -1,4 +1,3 @@
-
 #[derive(thiserror::Error, Debug)]
 pub enum WeaError {
     #[error("{0}")]
@@ -22,12 +21,12 @@ pub enum WeaError {
 #[derive(thiserror::Error, Debug)]
 #[error("{message}")]
 pub struct PayError {
-  message: String,
+    message: String,
 }
 impl PayError {
-    pub fn new(message:&str) -> Self {
+    pub fn new(message: &str) -> Self {
         PayError {
-        message:format!("{}",message),
-      }
+            message: format!("{}", message),
+        }
     }
 }

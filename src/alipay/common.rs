@@ -1,5 +1,7 @@
+use crate::alipay::prelude::*;
+use crate::error::WeaError;
+use crate::*;
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
-
 use openssl::{
     base64::{decode_block, encode_block},
     hash::MessageDigest,
@@ -7,14 +9,10 @@ use openssl::{
     x509::X509,
 };
 use reqwest::Url;
-use std::fs;
-use std::future::Future;
-//use anyhow::{anyhow, Result};
-use crate::alipay::prelude::*;
-use crate::error::WeaError;
-use crate::*;
 use serde::de::DeserializeOwned;
 use serde_json;
+use std::fs;
+use std::future::Future;
 
 pub trait BaseTrait {
     /// create order
@@ -24,6 +22,26 @@ pub trait BaseTrait {
         method: &str,
         data: ReqOrderBody,
     ) -> impl Future<Output = Result<ResOrderBody, WeaError>>;
+    /// 查询订单
+    fn query_order(
+        &self,
+        out_trade_no: &str,
+    ) -> impl Future<Output = Result<ResOrderBody, WeaError>>;
+    /// 查询订单支付宝订单号
+    fn query_order_by_trade_no(
+        &self,
+        trade_no: &str,
+    ) -> impl Future<Output = Result<ResOrderBody, WeaError>>;
+    /// 关闭订单
+    fn close_order(
+        &self,
+        body: ReqCloseOrderBody,
+    ) -> impl Future<Output = Result<ResCloseOrderBody, WeaError>>;
+    /// 撤销订单
+    fn cancel_order(
+        &self,
+        body: ReqCancelOrderBody,
+    ) -> impl Future<Output = Result<ResCancelOrderBody, WeaError>>;
     /// 构建请求client 同时设置好请求头
     /// 如果设置了mch_key 则会对body进行加密
     fn build_request_builder(
@@ -68,12 +86,75 @@ impl BaseTrait for Payment<AlipayConfig> {
     ) -> impl Future<Output = Result<ResOrderBody, WeaError>> {
         async move {
             let url = self.get_uri(method);
+            let data = match data.notify_url {
+                Some(_) => data,
+                None => {
+                    let notify_url = self.config.notify_url.clone();
+                    ReqOrderBody {
+                        notify_url: Some(notify_url),
+                        ..data
+                    }
+                }
+            };
             let order_body = serde_json::to_string(&data)?;
             self.do_request::<ResOrderBody>(&url, &"POST", &order_body)
                 .await
         }
     }
-
+    //query order
+    fn query_order(
+        &self,
+        out_trade_no: &str,
+    ) -> impl Future<Output = Result<ResOrderBody, WeaError>> {
+        async move {
+            let url = self.get_uri("alipay.trade.query");
+            let order_body = serde_json::to_string(&ReqQueryOrderBody {
+                out_trade_no: Some(out_trade_no.to_string()),
+                ..Default::default()
+            })?;
+            self.do_request::<ResOrderBody>(&url, &"POST", &order_body)
+                .await
+        }
+    }
+    // query order by trade_no
+    fn query_order_by_trade_no(
+        &self,
+        trade_no: &str,
+    ) -> impl Future<Output = Result<ResOrderBody, WeaError>> {
+        async move {
+            let url = self.get_uri("alipay.trade.query");
+            let order_body = serde_json::to_string(&ReqQueryOrderBody {
+                trade_no: Some(trade_no.to_string()),
+                ..Default::default()
+            })?;
+            self.do_request::<ResOrderBody>(&url, &"POST", &order_body)
+                .await
+        }
+    }
+    //close order
+    fn close_order(
+        &self,
+        body: ReqCloseOrderBody,
+    ) -> impl Future<Output = Result<ResCloseOrderBody, WeaError>> {
+        async move {
+            let url = self.get_uri("alipay.trade.close");
+            let order_body = serde_json::to_string(&body)?;
+            self.do_request::<ResCloseOrderBody>(&url, &"POST", &order_body)
+                .await
+        }
+    }
+    //cancel order
+    fn cancel_order(
+        &self,
+        body: ReqCancelOrderBody,
+    ) -> impl Future<Output = Result<ResCancelOrderBody, WeaError>> {
+        async move {
+            let url = self.get_uri("alipay.trade.cancel");
+            let order_body = serde_json::to_string(&body)?;
+            self.do_request::<ResCancelOrderBody>(&url, &"POST", &order_body)
+                .await
+        }
+    }
     //get uri
     fn get_uri(&self, method: &str) -> String {
         let url = method.replace(".", "/");
