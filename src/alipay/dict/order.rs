@@ -214,6 +214,18 @@ pub struct ReqOrderBody {
     //商家和支付宝签约的产品码
     #[serde(skip_serializing_if = "Option::is_none")]
     pub product_code: Option<String>,
+    //小程序支付中，小程序的APPID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub op_app_id: Option<String>,
+    //买家支付宝用户ID。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyer_id: Option<String>,
+    //买家支付宝用户唯一标识
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buyer_open_id: Option<String>,
+    //op_buyer_open_id
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub op_buyer_open_id: Option<String>,
     //卖家支付宝用户ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seller_id: Option<String>,

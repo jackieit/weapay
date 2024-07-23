@@ -170,8 +170,8 @@ impl BaseTrait for Payment<AlipayConfig> {
     ) -> Result<reqwest::RequestBuilder, WeaError> {
         let is_sandbox = self.config.is_sandbox.unwrap_or(false);
         let base_url = match is_sandbox {
-            true => "https://openapi.alipay.com",
-            false => "https://openapi-sandbox.dl.alipaydev.com",
+            false => "https://openapi.alipay.com",
+            true => "https://openapi-sandbox.dl.alipaydev.com",
         };
 
         let base_url = Url::parse(base_url).map_err(|_e| e("parse url error"))?;
@@ -196,7 +196,7 @@ impl BaseTrait for Payment<AlipayConfig> {
                 &self.config.app_id, nonce_str, timestamp
             )
         };
-
+        //println!("auth_string=={}\n", auth_string);
         let with_aes = self.config.mch_key.is_some();
         let body = if with_aes {
             let body = self.encrypt(body)?;
@@ -205,8 +205,11 @@ impl BaseTrait for Payment<AlipayConfig> {
             body.to_string()
         };
         let sign_data: Vec<&str> = vec![&auth_string, method, url, &body];
+        //println!("sign_data=={:?}\n", sign_data);
         let signature = generate_signature(sign_data, &self.config.app_private_key)?;
+        //println!("signature=={}\n", signature);
         let authorization = format!("ALIPAY-SHA256withRSA {},sign={}", auth_string, signature);
+        //println!("authorization=={}\n", authorization);
         let client = reqwest::Client::new();
         let req_builder = match method {
             "GET" => client.get(full_url),
@@ -337,7 +340,7 @@ impl BaseTrait for Payment<AlipayConfig> {
 
 #[cfg(test)]
 mod tests {
-    use super::BaseTrait;
+    use crate::alipay::prelude::*;
     use crate::*;
     //test aes encrypt and decrypt
     #[test]
@@ -355,5 +358,59 @@ mod tests {
         //println!("encrypt_data=={}",encrypt_data);
         //println!("decrypt_data=={}",decrypt_data);
         assert_eq!(data, decrypt_data);
+    }
+    // test create order
+    #[tokio::test]
+    async fn test_create_order() {
+        let config = crate::tests::get_config().1;
+        println!("{:?}", config);
+        let payment = Payment::new(config.clone());
+        let data = ReqOrderBody {
+            out_trade_no: "T20240407003".to_string(),
+            total_amount: "0.01".to_string(),
+            subject: "旅行卡年卡服务".to_string(),
+            product_code: Some("JSAPI_PAY".to_string()),
+            op_app_id: Some(config.app_id),
+            buyer_id: Some("2088002042611246".to_string()),
+            ..Default::default()
+        };
+        let result = payment.create_order("alipay.trade.create", data).await;
+        if result.is_err() {
+            let error = result.err().unwrap();
+            println!("{}", error);
+        } else {
+            let result = result.unwrap();
+            assert_eq!(result.out_trade_no, Some("T20240407003".to_string()));
+            //println!("{:?}", result);
+        }
+    }
+    // test query order
+    #[tokio::test]
+    async fn test_query_order() {
+        let config = crate::tests::get_config().1;
+        let payment = Payment::new(config);
+        let result = payment.query_order("2406220006").await;
+        if result.is_err() {
+            let error = result.err().unwrap();
+            println!("{}", error);
+        } else {
+            let result = result.unwrap();
+            assert_eq!(result.out_trade_no, Some("2406220006".to_string()));
+            //println!("{:?}", result);
+        }
+        let result = payment
+            .query_order_by_trade_no("2024062222001401371424183634")
+            .await;
+        if result.is_err() {
+            let error = result.err().unwrap();
+            println!("{}", error);
+        } else {
+            let result = result.unwrap();
+            assert_eq!(
+                result.trade_no,
+                Some("2024062222001401371424183634".to_string())
+            );
+            //println!("{:?}", result);
+        }
     }
 }

@@ -162,10 +162,13 @@ pub mod tests {
         let ali_app_id = env_map.get("ali_app_id").unwrap().to_string();
         let ali_public_key = env_map.get("ali_public_key").unwrap().to_string();
         let ali_private_key = env_map.get("ali_private_key").unwrap().to_string();
+        let ali_app_public_key = env_map.get("ali_app_public_key").unwrap().to_string();
         let ali_notify_url = env_map.get("ali_notify_url").unwrap().to_string();
+        let _ali_mch_key = env_map.get("ali_mch_key").unwrap().to_string();
         let alipay_cfg = super::AlipayConfig {
             app_id: ali_app_id,
             app_private_key: ali_private_key,
+            app_public_cert: Some(ali_app_public_key),
             alipay_public_cert: ali_public_key,
             notify_url: ali_notify_url,
             ..Default::default()
