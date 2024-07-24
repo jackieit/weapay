@@ -46,6 +46,7 @@ pub trait BaseTrait {
         body: ReqCancelOrderBody,
     ) -> impl Future<Output = Result<ResCancelOrderBody, WeaError>>;
     /// 预处理异步通知此方法仅针对异步URL通知的数据进行验签
+    /// 如当面付的预下单通知，APP支付的异步通知等
     fn notify(&self, query_str: &str) -> Result<NotifyOrderBody, WeaError>;
     /// 构建请求client 同时设置好请求头
     /// 如果设置了mch_key 则会对body进行加密

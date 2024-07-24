@@ -16,9 +16,16 @@ pub fn generate_signature(data: Vec<&str>, private_key: &str) -> Result<String, 
     let data = data + "\n";
     let private_key_content = std::fs::read_to_string(private_key)?;
     //private_key_content = prepair_cert(private_key_content, true);
-    let private_u8 = decode_block(&private_key_content)?;
-    let rsa = Rsa::private_key_from_der(private_u8.as_slice())?;
-    let pkey = PKey::from_rsa(rsa)?;
+    //print!("RSA PRIVATE, {}", private_key_content);
+    let pkey = if private_key_content.contains("-----BEGIN") {
+        let rsa = Rsa::private_key_from_pem(&private_key_content.as_bytes())?;
+        PKey::from_rsa(rsa)?
+    } else {
+        let private_u8 = decode_block(&private_key_content)?;
+        let rsa = Rsa::private_key_from_der(private_u8.as_slice())?;
+        PKey::from_rsa(rsa)?
+    };
+
     let mut signer = Signer::new(MessageDigest::sha256(), &pkey)?;
     //signer.set_rsa_padding(Padding::PKCS1).unwrap();
     signer.update(data.as_bytes())?;
