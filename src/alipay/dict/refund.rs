@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 /// 退款请示参数
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ReqRefundOrder {
+    //退款金额
+    pub refund_amount: String,
     //商户订单号
     #[serde(skip_serializing_if = "Option::is_none")]
     pub out_trade_no: Option<String>,
@@ -28,7 +30,7 @@ pub struct ReqRefundOrder {
     pub related_settle_confirm_no: Option<String>,
 }
 //退分账明细信息
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ReqOpenApiRoyaltyDetailInfoPojo {
     //收入方账户
     pub trans_in: String,
@@ -57,7 +59,7 @@ pub struct ReqOpenApiRoyaltyDetailInfoPojo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trans_in_name: Option<String>,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ReqRefundGoodsDetail {
     //商品的编号
     pub goods_id: String,
@@ -135,7 +137,7 @@ pub struct TradeFundBill {
 }
 
 ///退款查询
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ReqRefundQuery {
     //商户订单号
     #[serde(skip_serializing_if = "Option::is_none")]

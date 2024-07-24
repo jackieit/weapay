@@ -17,3 +17,25 @@ impl BillTrait for Payment<AlipayConfig> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::alipay::prelude::*;
+    use crate::*;
+    #[tokio::test]
+    async fn test_trade_bill() {
+        let config = crate::tests::get_config().1;
+        //println!("{:?}", config);
+        let payment = Payment::new(config);
+        let data = ReqBillQuery {
+            bill_type: "trade".to_string(),
+            bill_date: "2024-07-24".to_string(),
+            ..Default::default()
+        };
+        let result = payment.trade_bill(data).await;
+        if result.is_err() {
+            println!("{:?}", result);
+        }
+        assert!(result.is_ok());
+    }
+}

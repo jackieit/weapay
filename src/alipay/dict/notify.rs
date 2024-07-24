@@ -55,9 +55,9 @@ pub struct NotifyOrderBody {
     //version
     pub version: Option<String>,
     //sign_type
-    pub sign_type: String,
+    pub sign_type: Option<String>,
     //签名。
-    pub sign: String,
+    pub sign: Option<String>,
     //支付宝交易号。支付宝交易凭证号
     pub trade_no: String,
     //开发者的 app_id。
@@ -106,7 +106,7 @@ pub struct NotifyOrderBody {
     //交易结束时间。
     pub gmt_close: Option<String>,
     //支付金额信息。
-    pub fund_bill_list: Option<Vec<NotifyFundBill>>,
+    pub fund_bill_list: Option<String>,
     //公共回传参数，如果请求时传递了该参数，则返回给商家时会在异步通知时将该参数原样返回。
     pub passback_params: Option<String>,
     //账期结算标识

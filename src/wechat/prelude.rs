@@ -36,7 +36,7 @@ pub use super::dict::refund::ResourceRefundBody;
 pub use super::refund::RefundTrait;
 
 //帐单相关
-pub use super::bill_query::BillTrait;
+pub use super::bill::BillTrait;
 pub use super::dict::bill::BillResponse;
 
 //证书相关

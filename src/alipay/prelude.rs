@@ -47,11 +47,12 @@ pub use super::dict::refund::TradeFundBill;
 
 pub use super::dict::refund::DepositBackInfo;
 pub use super::dict::refund::ReqRefundQuery;
+pub use super::dict::refund::ResRefundQuery;
 pub use super::dict::refund::ResRefundRoyalty;
-
 //帐单
 pub use super::dict::bill::ReqBillQuery;
 pub use super::dict::bill::ResBill;
 
+pub use super::bill::BillTrait;
 pub use super::common::BaseTrait;
 pub use super::refund::RefundTrait;

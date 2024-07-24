@@ -6,14 +6,16 @@ use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvI
 use openssl::{
     base64::{decode_block, encode_block},
     hash::MessageDigest,
+    pkey::PKey,
+    rsa::Rsa,
     sign::Verifier,
     x509::X509,
 };
 use reqwest::Url;
 use serde::de::DeserializeOwned;
 use serde_json;
-use std::fs;
 use std::future::Future;
+use std::{collections::HashMap, fs};
 
 pub trait BaseTrait {
     /// create order
@@ -43,6 +45,8 @@ pub trait BaseTrait {
         &self,
         body: ReqCancelOrderBody,
     ) -> impl Future<Output = Result<ResCancelOrderBody, WeaError>>;
+    /// 预处理异步通知
+    fn notify(&self, query_str: &str) -> Result<NotifyOrderBody, WeaError>;
     /// 构建请求client 同时设置好请求头
     /// 如果设置了mch_key 则会对body进行加密
     fn build_request_builder(
@@ -91,10 +95,7 @@ impl BaseTrait for Payment<AlipayConfig> {
                 Some(_) => data,
                 None => {
                     let notify_url = self.config.notify_url.clone();
-                    ReqOrderBody {
-                        notify_url: Some(notify_url),
-                        ..data
-                    }
+                    ReqOrderBody { notify_url, ..data }
                 }
             };
             let order_body = serde_json::to_string(&data)?;
@@ -156,6 +157,43 @@ impl BaseTrait for Payment<AlipayConfig> {
                 .await
         }
     }
+    //pre_notify
+    fn notify(&self, query_str: &str) -> Result<NotifyOrderBody, WeaError> {
+        let tmp = "https://xx.com/?".to_string() + &query_str;
+        let url = Url::parse(&tmp).map_err(|_e| e("parse url error"))?;
+        let url = url.query_pairs();
+        let mut sign: String = "".to_string();
+        let mut hm: HashMap<String, String> = HashMap::new();
+        for (_, (key, value)) in url.enumerate() {
+            if key == "sign_type" {
+                continue;
+            }
+            if key == "sign" {
+                sign = value.as_ref().to_string();
+                //hm.insert(key.as_ref().to_string(), value.as_ref().to_string());
+            } else {
+                hm.insert(key.as_ref().to_string(), value.as_ref().to_string());
+            }
+        }
+        //println!("sign=\n{}", sign);
+        let mut sorted_keys: Vec<_> = hm.keys().collect();
+        sorted_keys.sort();
+        // println!("sorted_keys=={:?}", sorted_keys);
+        let mut new_str = "".to_string();
+        for key in sorted_keys.iter() {
+            new_str = new_str + key + "=" + hm.get(*key).unwrap() + "&";
+        }
+        let new_str = new_str.trim_end_matches('&');
+        //println!("new_str=={}", new_str);
+        let signed = self.verify_signature(vec![&new_str], &sign)?;
+        if !signed {
+            return Err(e("verify signature error"));
+        }
+
+        let hm_value = serde_json::to_value(&hm)?;
+        let notify: NotifyOrderBody = serde_json::from_value(hm_value)?;
+        Ok(notify)
+    }
     //get uri
     fn get_uri(&self, method: &str) -> String {
         let url = method.replace(".", "/");
@@ -179,7 +217,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         let full_url = full_url.as_str();
         let timestamp = get_timestamp_millis()?.to_string();
         let nonce_str = generate_random_string(32);
-        let request_id = format!("{}{}", generate_random_string(10), timestamp);
+        let request_id = format!("{}-{}", generate_random_string(8), timestamp);
         let is_cert_model = self.config.alipay_root_cert.is_some();
 
         //let alipay_root_serial_no = get_cert_serial(&self.config.alipay_root_cert.clone())?;
@@ -224,9 +262,11 @@ impl BaseTrait for Payment<AlipayConfig> {
             req_builder
         };
         let req_builder = if with_aes {
-            req_builder.header("alipay-encrypt-type", "AES")
-        } else {
             req_builder
+                .header("alipay-encrypt-type", "AES")
+                .header("Content-Type", "text/plain")
+        } else {
+            req_builder.header("Content-Type", "application/json")
         };
         let req_builder = if is_cert_model {
             let alipay_root_serial_no =
@@ -236,7 +276,6 @@ impl BaseTrait for Payment<AlipayConfig> {
             req_builder
         };
         let req_builder = req_builder
-            .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .header("User-Agent", SDK_UA)
             .header("alipay-request-id", request_id)
@@ -257,6 +296,14 @@ impl BaseTrait for Payment<AlipayConfig> {
             let status_code = res.status();
             if status_code == 200 || status_code == 204 {
                 let res = res.text().await?;
+                let with_aes = self.config.mch_key.is_some();
+                let res = if with_aes {
+                    let res = self.decrypt(&res)?;
+                    res
+                } else {
+                    res
+                };
+                println!("res=={}", res);
                 let res: U = serde_json::from_str(&res.clone())?;
                 return Ok(res);
             } else {
@@ -270,27 +317,34 @@ impl BaseTrait for Payment<AlipayConfig> {
     }
     // verify_signature
     fn verify_signature(&self, data: Vec<&str>, signature: &str) -> Result<bool, WeaError> {
-        let data = data.join("\n") + "\n";
-        //let serial_no = self
+        let data = if data.len() == 1 {
+            data[0].to_string()
+        } else {
+            data.join("\n") + "\n"
+        };
+        //println!("data=={}", data);
         let alipay_public_cert = self.config.alipay_public_cert.clone();
-        //let alipay_cert_no = get_cert_serial(&alipay_public_cert)?;
-        //if alipay_cert_no != serial {
-        //    return Err(e("serial_no error"));
-        //}
         // 加载公钥,公钥为文件内容
         let alipay_public_cert_content = fs::read_to_string(alipay_public_cert)?;
-        let alipay_public_cert_content = prepair_cert(alipay_public_cert_content, false);
-        let app_cert = X509::from_pem(alipay_public_cert_content.as_bytes())?;
-        let pkey = app_cert.public_key()?;
-        //let data = data + "\n";
+        let pkey = if alipay_public_cert_content.contains("-----BEGIN CERTIFICATE-----") {
+            let app_cert = X509::from_pem(alipay_public_cert_content.as_bytes())?;
+            app_cert.public_key()?
+        } else {
+            let alipay_public_cert_content = decode_block(&alipay_public_cert_content)?;
+            let rsa = Rsa::public_key_from_der(alipay_public_cert_content.as_slice())?;
+            PKey::from_rsa(rsa)?
+        };
         // 创建验证器并设置哈希算法为 SHA256
         let mut verifier = Verifier::new(MessageDigest::sha256(), &pkey)?;
         // 添加待验证的数据
+        //verifier.set_rsa_padding(openssl::rsa::Padding::PKCS1)?;
+        //verifier.set_rsa_padding(openssl::rsa::Padding::PKCS1)?;
         verifier.update(data.as_bytes())?;
         // 对签名进行 Base64 解码
         let signature_decoded = decode_block(signature)?;
         // 验证签名
-        let result = verifier.verify(&signature_decoded)?;
+        let result = verifier.verify(signature_decoded.as_slice())?;
+        //println!("result=={}", result);
         Ok(result)
     }
     //encrypt
@@ -302,10 +356,13 @@ impl BaseTrait for Payment<AlipayConfig> {
         let mch_key = decode_block(&mch_key.unwrap())?;
         let mch_key = mch_key.as_slice();
         type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
-        let iv = [0u8; 16];
-        let mut buf = [0u8; 48];
-        let data = data.as_bytes();
         let pt_len = data.len();
+        let iv = [0u8; 16];
+        let buf_len = pt_len + (16 - pt_len % 16);
+        let mut buf = vec![0u8; buf_len];
+        let mut buf = buf.as_mut_slice();
+        let data = data.as_bytes();
+        //let pt_len = data.len();
         buf[..pt_len].copy_from_slice(data);
         let cipher =
             Aes128CbcEnc::new_from_slices(mch_key, &iv).map_err(|_e| e("Aes128 loadkey error"))?;
@@ -329,7 +386,10 @@ impl BaseTrait for Payment<AlipayConfig> {
         let data = decode_block(data)?;
         let data = data.as_slice();
         let pt = Aes128CbcDec::new_from_slices(mch_key, &iv).unwrap();
-        let mut buf = [0u8; 48];
+        let buf_len = data.len() + (16 - data.len() % 16);
+        let mut buf = vec![0u8; buf_len];
+        let mut buf = buf.as_mut_slice();
+        // let mut buf = [0u8; 1024];
         let pt = pt
             .decrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf)
             .map_err(|_e| e("unPading error"))?;
@@ -367,11 +427,11 @@ mod tests {
         let payment = Payment::new(config.clone());
         let data = ReqOrderBody {
             out_trade_no: "T20240407003".to_string(),
-            total_amount: "0.01".to_string(),
+            total_amount: "10.01".to_string(),
             subject: "旅行卡年卡服务".to_string(),
             product_code: Some("JSAPI_PAY".to_string()),
             op_app_id: Some(config.app_id),
-            buyer_id: Some("2088002042611246".to_string()),
+            buyer_id: Some("2088722032795825".to_string()),
             ..Default::default()
         };
         let result = payment.create_order("alipay.trade.create", data).await;
@@ -381,7 +441,7 @@ mod tests {
         } else {
             let result = result.unwrap();
             assert_eq!(result.out_trade_no, Some("T20240407003".to_string()));
-            //println!("{:?}", result);
+            println!("trade_no==>{:?}", result.trade_no);
         }
     }
     // test query order
@@ -411,6 +471,68 @@ mod tests {
                 Some("2024062222001401371424183634".to_string())
             );
             //println!("{:?}", result);
+        }
+    }
+    // test h5 pay create order
+    #[tokio::test]
+    async fn test_h5_pay() {
+        let config = crate::tests::get_config().1;
+        let payment = Payment::new(config);
+        let data = ReqOrderBody {
+            out_trade_no: "T20240407003".to_string(),
+            total_amount: "10.01".to_string(),
+            subject: "旅行卡年卡服务".to_string(),
+            product_code: Some("QUICK_WAP_WAY".to_string()),
+            //buyer_id: Some("2088722032795825".to_string()),
+            ..Default::default()
+        };
+        let result = payment.create_order("alipay.trade.wap.pay", data).await;
+        if result.is_err() {
+            let error = result.err().unwrap();
+            println!("{}", error);
+        } else {
+            let result = result.unwrap();
+            assert_eq!(result.page_redirection_data.is_some(), true);
+            println!("trade_no==>{:?}", result.page_redirection_data);
+        }
+    }
+    // tests face to face pay create order
+    #[tokio::test]
+    async fn test_face_to_face_pay() {
+        let config = crate::tests::get_config().1;
+        let payment = Payment::new(config);
+        let data = ReqOrderBody {
+            out_trade_no: "T20240407007".to_string(),
+            total_amount: "0.99".to_string(),
+            subject: "旅行卡年卡服务".to_string(),
+            //product_code: Some("FACE_TO_FACE_PAYMENT".to_string()),
+            //buyer_id: Some("2088722032795825".to_string()),
+            ..Default::default()
+        };
+        let result = payment.create_order("alipay.trade.precreate", data).await;
+        if result.is_err() {
+            let error = result.err().unwrap();
+            println!("{}", error);
+        } else {
+            let result = result.unwrap();
+            assert_eq!(result.qr_code.is_some(), true);
+            println!("qr_code==>{:?}", result.qr_code);
+        }
+    }
+    // test pre_notify
+    #[test]
+    fn test_pre_notify() {
+        let config = crate::tests::get_config().1;
+        let payment = Payment::new(config);
+        let query_str = "gmt_create=2024-07-24+10%3A43%3A59&charset=UTF-8&seller_email=lwojga1716%40sandbox.com&subject=%E6%97%85%E8%A1%8C%E5%8D%A1%E5%B9%B4%E5%8D%A1%E6%9C%8D%E5%8A%A1&sign=kT7bTHhFPgBeOqEqmNe09%2BxmsZWJrxihcAL6fuf3VSvsU3eg6b0o3yDU8xAZZbXkEBGyACRppAgiabnHzh9SyFrSbJTAY8GUemvgiVgh9r3Sbsb%2Fij1Ef94AgXJYxBclcGDNfcM%2FVtySaLuBjZLmqSX4M6cWq3b3vBG%2BYIxew83ZchOBEMSSSnzpIUkRoFPYQ9Y1YDUCaEnDlslJ%2BLSKlQS2ZsgLmbOmZ%2BeNAJ0wxIw8SCR4Kd6AkuSkinjiPhVVGqbtxJK6iu9q1T9MqwdrG8MqJl0ztni3emWMuuihCC%2B5biYVM0u49HUnHEW%2BS%2FyerbllJWu%2BykG%2FvHFAnrz2Bw%3D%3D&buyer_id=2088722032795825&invoice_amount=0.99&notify_id=2024072401222104407195820503475973&fund_bill_list=%5B%7B%22amount%22%3A%220.99%22%2C%22fundChannel%22%3A%22ALIPAYACCOUNT%22%7D%5D&notify_type=trade_status_sync&trade_status=TRADE_SUCCESS&receipt_amount=0.99&buyer_pay_amount=0.99&app_id=9021000135675809&sign_type=RSA2&seller_id=2088721032816228&gmt_payment=2024-07-24+10%3A44%3A06&notify_time=2024-07-24+10%3A44%3A07&version=1.0&out_trade_no=T20240407007&total_amount=0.99&trade_no=2024072422001495820503421248&auth_app_id=9021000135675809&buyer_logon_id=uyskdk2812%40sandbox.com&point_amount=0.00";
+        let result = payment.notify(query_str);
+        if result.is_err() {
+            let error = result.err().unwrap();
+            println!("{}", error);
+        } else {
+            let result = result.unwrap();
+            assert_eq!(result.out_trade_no, "T20240407007".to_string());
+            println!("{:?}", result);
         }
     }
 }
