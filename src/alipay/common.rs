@@ -223,8 +223,7 @@ impl BaseTrait for Payment<AlipayConfig> {
 
         //let alipay_root_serial_no = get_cert_serial(&self.config.alipay_root_cert.clone())?;
         let auth_string = if is_cert_model {
-            let app_public_cert_sn =
-                get_cert_serial(&self.config.app_public_cert.clone().unwrap())?;
+            let app_public_cert_sn = get_cert_sn(&self.config.app_public_cert.clone().unwrap())?;
             format!(
                 "app_id={},app_cert_sn={},nonce={},timestamp={}",
                 &self.config.app_id, &app_public_cert_sn, nonce_str, timestamp
@@ -271,7 +270,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         };
         let req_builder = if is_cert_model {
             let alipay_root_serial_no =
-                get_cert_serial(&self.config.alipay_root_cert.clone().unwrap())?;
+                get_root_cert_sn(&self.config.alipay_root_cert.clone().unwrap())?;
             req_builder.header("alipay-root-cert-sn", alipay_root_serial_no)
         } else {
             req_builder
@@ -295,8 +294,28 @@ impl BaseTrait for Payment<AlipayConfig> {
             let req_builder = self.build_request_builder(url, method, body)?;
             let res = req_builder.send().await?;
             let status_code = res.status();
+            let headers = res.headers().clone();
+            let res = res.text().await?;
+            let is_cert_model = self.config.alipay_root_cert.is_some();
+            if is_cert_model {
+                let mut verify_data: Vec<&str> = vec![];
+                let sn = headers.get("alipay-sn").unwrap().to_str()?;
+                let alipay_public_cert_sn = get_cert_sn(&self.config.alipay_public_cert.clone())?;
+                if sn != alipay_public_cert_sn {
+                    return Err(e("alipay-sn is not match"));
+                }
+                let timestamp = headers.get("alipay-timestamp").unwrap().to_str()?;
+                verify_data.push(timestamp);
+                let nonce = headers.get("alipay-nonce").unwrap().to_str()?;
+                verify_data.push(nonce);
+                let signature = headers.get("alipay-signature").unwrap().to_str()?;
+                verify_data.push(&res);
+                let signed = self.verify_signature(verify_data, signature)?;
+                if !signed {
+                    return Err(e("response verify signature error"));
+                }
+            }
             if status_code == 200 || status_code == 204 {
-                let res = res.text().await?;
                 let with_aes = self.config.mch_key.is_some();
                 let res = if with_aes {
                     let res = self.decrypt(&res)?;
@@ -304,11 +323,10 @@ impl BaseTrait for Payment<AlipayConfig> {
                 } else {
                     res
                 };
-                println!("res=={}", res);
                 let res: U = serde_json::from_str(&res.clone())?;
                 return Ok(res);
             } else {
-                let res = res.text().await?;
+                //let res = res.text().await?;
                 if res.is_empty() {
                     return Err(e(&status_code.to_string()));
                 }

@@ -7,7 +7,7 @@ edition = "2021"
 aes = "0.8.4"
 cbc = "0.1.2"
 aes-gcm = {version = "0.10.3", features=["std"]}
-openssl = "0.10"
+openssl = "0.10.66"
 rand = "0.8.5"
 reqwest = "0.12.5"
 serde = { version = "1", features = ["derive"] }

@@ -12,6 +12,8 @@ pub enum WeaError {
     SystemTimeError(#[from] std::time::SystemTimeError),
     #[error("Json convert error: {0}")]
     JsonConvertError(#[from] serde_json::Error),
+    #[error("To String error: {0}")]
+    ToStringError(#[from] reqwest::header::ToStrError),
     #[error("request api error: {0}")]
     ReqwestError(#[from] reqwest::Error),
     #[error("{0}")]
