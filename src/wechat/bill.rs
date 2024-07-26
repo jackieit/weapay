@@ -1,4 +1,4 @@
-use crate::error::WeaError;
+use crate::error::WeaResult;
 use crate::utils::*;
 use crate::wechat::prelude::*;
 use crate::*;
@@ -12,7 +12,7 @@ pub trait BillTrait {
         bill_type: Option<String>,
         tar_type: Option<String>,
         with_mchid: bool,
-    ) -> impl Future<Output = Result<BillResponse, WeaError>>;
+    ) -> impl Future<Output = WeaResult<BillResponse>>;
     /// 申请资金账单
     #[allow(dead_code)]
     fn fund_bill(
@@ -20,14 +20,11 @@ pub trait BillTrait {
         bill_date: String,
         account_type: Option<String>,
         tar_type: Option<String>,
-    ) -> impl Future<Output = Result<BillResponse, WeaError>>;
+    ) -> impl Future<Output = WeaResult<BillResponse>>;
     /// 下载帐单
     #[allow(dead_code)]
-    //fn download(&self,download_url: &str) -> Result<Bytes, WeaError>;
-    fn download(
-        &self,
-        download_url: &str,
-    ) -> impl Future<Output = Result<reqwest::Response, WeaError>>;
+    //fn download(&self,download_url: &str) -> WeaResult<Bytes>;
+    fn download(&self, download_url: &str) -> impl Future<Output = WeaResult<reqwest::Response>>;
 }
 impl BillTrait for Payment<WechatConfig> {
     fn trade_bill(
@@ -36,7 +33,7 @@ impl BillTrait for Payment<WechatConfig> {
         bill_type: Option<String>,
         tar_type: Option<String>,
         with_mchid: bool,
-    ) -> impl Future<Output = Result<BillResponse, WeaError>> {
+    ) -> impl Future<Output = WeaResult<BillResponse>> {
         let mut url = format!(
             "/v3/bill/tradebill?bill_date={}&bill_type={}&tar_type={}",
             bill_date,
@@ -53,7 +50,7 @@ impl BillTrait for Payment<WechatConfig> {
         bill_date: String,
         account_type: Option<String>,
         tar_type: Option<String>,
-    ) -> impl Future<Output = Result<BillResponse, WeaError>> {
+    ) -> impl Future<Output = WeaResult<BillResponse>> {
         let url = format!(
             "/v3/bill/fundflowbill?bill_date={}&account_type={}&tar_type={}",
             bill_date,
@@ -62,10 +59,7 @@ impl BillTrait for Payment<WechatConfig> {
         );
         async move { self.do_request::<BillResponse>(&url, "GET", "").await }
     }
-    fn download(
-        &self,
-        download_url: &str,
-    ) -> impl Future<Output = Result<reqwest::Response, WeaError>> {
+    fn download(&self, download_url: &str) -> impl Future<Output = WeaResult<reqwest::Response>> {
         let download_url = download_url.replace("https://api.mch.weixin.qq.com", "");
         async move {
             let req_builder = self.build_request_builder(&download_url, "GET", "")?;

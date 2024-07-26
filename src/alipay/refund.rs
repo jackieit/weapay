@@ -1,25 +1,19 @@
 use crate::alipay::prelude::*;
-use crate::error::WeaError;
+use crate::error::WeaResult;
 use crate::*;
 use std::future::Future;
 pub trait RefundTrait {
     /// 申请退款
-    fn refund(
-        &self,
-        data: ReqRefundOrder,
-    ) -> impl Future<Output = Result<ResRefundResponse, WeaError>>;
+    fn refund(&self, data: ReqRefundOrder) -> impl Future<Output = WeaResult<ResRefundResponse>>;
 
     /// 查询退款
     fn query_refund(
         &self,
         refund_query: ReqRefundQuery,
-    ) -> impl Future<Output = Result<ResRefundQuery, WeaError>>;
+    ) -> impl Future<Output = WeaResult<ResRefundQuery>>;
 }
 impl RefundTrait for Payment<AlipayConfig> {
-    fn refund(
-        &self,
-        data: ReqRefundOrder,
-    ) -> impl Future<Output = Result<ResRefundResponse, WeaError>> {
+    fn refund(&self, data: ReqRefundOrder) -> impl Future<Output = WeaResult<ResRefundResponse>> {
         async move {
             let refund_body = serde_json::to_string(&data)?;
             let url = self.get_uri("alipay.trade.refund");
@@ -31,7 +25,7 @@ impl RefundTrait for Payment<AlipayConfig> {
     fn query_refund(
         &self,
         refund_query: ReqRefundQuery,
-    ) -> impl Future<Output = Result<ResRefundQuery, WeaError>> {
+    ) -> impl Future<Output = WeaResult<ResRefundQuery>> {
         async move {
             let refund_query = serde_json::to_string(&refund_query)?;
             let url = self.get_uri("alipay.trade.fastpay.refund.query");

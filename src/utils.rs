@@ -1,15 +1,15 @@
-use crate::error::{PayError, WeaError};
+use crate::error::WeaError;
 use openssl::{
     base64::{decode_block, encode_block},
     hash::{hash, MessageDigest},
     //OpenSSLString,
     nid::Nid,
     pkey::PKey,
+    rand::rand_bytes,
     rsa::Rsa,
     sign::Signer,
     x509::X509,
 };
-use rand::{distributions::Alphanumeric, Rng};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 生成签名 data: vec!['GET', 'https://xxx', '1395712654', 'nonce_str', 'body']
@@ -38,11 +38,19 @@ pub(crate) fn generate_signature(data: Vec<&str>, private_key: &str) -> Result<S
 }
 // generate a random string
 pub(crate) fn generate_random_string(len: usize) -> String {
-    let rng = rand::thread_rng();
-    rng.sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect()
+    let num_bytes = (len + 1) / 2;
+    let mut bytes = vec![0u8; num_bytes];
+    rand_bytes(&mut bytes).unwrap();
+    let random_string = bytes
+        .iter()
+        .map(|byte| format!("{:02x}", byte))
+        .collect::<String>();
+    let random_string = if len % 2 == 0 {
+        random_string
+    } else {
+        random_string[..len].to_string()
+    };
+    random_string
 }
 // get current unix timestamp
 pub(crate) fn get_timestamp() -> Result<u64, WeaError> {
@@ -60,7 +68,7 @@ pub(crate) fn get_timestamp_millis() -> Result<u128, WeaError> {
 }
 // short for payerror
 pub(crate) fn e(message: &str) -> WeaError {
-    WeaError::PayError(PayError::new(message))
+    WeaError::new("".to_string(), message.to_string())
 }
 // get cert serial number usedby wechat pay
 pub(crate) fn get_cert_serial(cert: &str) -> Result<String, WeaError> {
@@ -143,5 +151,12 @@ mod tests {
             root_sn,
             "687b59193f3f462dd5336e5abf83c5d8_02941eef3187dddf3d3b83462e1dfcf6".to_string()
         );
+    }
+    //test generate random string
+    #[test]
+    fn test_generate_random_string() {
+        let random_string = generate_random_string(32);
+        println!("random_string==={}", random_string);
+        assert_eq!(random_string.len(), 32);
     }
 }

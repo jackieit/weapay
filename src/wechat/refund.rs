@@ -1,24 +1,15 @@
-use crate::error::WeaError;
+use crate::error::WeaResult;
 use crate::wechat::prelude::*;
 use crate::*;
 use std::future::Future;
 pub trait RefundTrait {
     /// 申请退款
-    fn refund(
-        &self,
-        data: ReqRefundOrder,
-    ) -> impl Future<Output = Result<RefundResponse, WeaError>>;
+    fn refund(&self, data: ReqRefundOrder) -> impl Future<Output = WeaResult<RefundResponse>>;
     /// 查询退款
-    fn query_refund(
-        &self,
-        out_refund_no: &str,
-    ) -> impl Future<Output = Result<RefundResponse, WeaError>>;
+    fn query_refund(&self, out_refund_no: &str) -> impl Future<Output = WeaResult<RefundResponse>>;
 }
 impl RefundTrait for Payment<WechatConfig> {
-    fn refund(
-        &self,
-        data: ReqRefundOrder,
-    ) -> impl Future<Output = Result<RefundResponse, WeaError>> {
+    fn refund(&self, data: ReqRefundOrder) -> impl Future<Output = WeaResult<RefundResponse>> {
         let mut new_data: ReqRefundOrder;
         if self.is_sp() {
             new_data = ReqRefundOrder {
@@ -38,10 +29,7 @@ impl RefundTrait for Payment<WechatConfig> {
                 .await
         }
     }
-    fn query_refund(
-        &self,
-        out_refund_no: &str,
-    ) -> impl Future<Output = Result<RefundResponse, WeaError>> {
+    fn query_refund(&self, out_refund_no: &str) -> impl Future<Output = WeaResult<RefundResponse>> {
         let url = format!("/v3/refund/domestic/refunds/{}", out_refund_no);
         let url = self.get_uri(&url, true, false);
         async move { self.do_request::<RefundResponse>(&url, "GET", "").await }

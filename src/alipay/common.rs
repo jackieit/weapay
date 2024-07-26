@@ -1,5 +1,5 @@
 use crate::alipay::prelude::*;
-use crate::error::WeaError;
+use crate::error::WeaResult;
 use crate::utils::*;
 use crate::*;
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
@@ -24,30 +24,27 @@ pub trait BaseTrait {
         &self,
         method: &str,
         data: ReqOrderBody,
-    ) -> impl Future<Output = Result<ResOrderBody, WeaError>>;
+    ) -> impl Future<Output = WeaResult<ResOrderBody>>;
     /// 查询订单
-    fn query_order(
-        &self,
-        out_trade_no: &str,
-    ) -> impl Future<Output = Result<ResOrderBody, WeaError>>;
+    fn query_order(&self, out_trade_no: &str) -> impl Future<Output = WeaResult<ResOrderBody>>;
     /// 查询订单支付宝订单号
     fn query_order_by_trade_no(
         &self,
         trade_no: &str,
-    ) -> impl Future<Output = Result<ResOrderBody, WeaError>>;
+    ) -> impl Future<Output = WeaResult<ResOrderBody>>;
     /// 关闭订单
     fn close_order(
         &self,
         body: ReqCloseOrderBody,
-    ) -> impl Future<Output = Result<ResCloseOrderBody, WeaError>>;
+    ) -> impl Future<Output = WeaResult<ResCloseOrderBody>>;
     /// 撤销订单
     fn cancel_order(
         &self,
         body: ReqCancelOrderBody,
-    ) -> impl Future<Output = Result<ResCancelOrderBody, WeaError>>;
+    ) -> impl Future<Output = WeaResult<ResCancelOrderBody>>;
     /// 预处理异步通知此方法仅针对异步URL通知的数据进行验签
     /// 如当面付的预下单通知，APP支付的异步通知等
-    fn notify(&self, query_str: &str) -> Result<NotifyOrderBody, WeaError>;
+    fn notify(&self, query_str: &str) -> WeaResult<NotifyOrderBody>;
     /// 构建请求client 同时设置好请求头
     /// 如果设置了mch_key 则会对body进行加密
     fn build_request_builder(
@@ -55,14 +52,14 @@ pub trait BaseTrait {
         url: &str,
         method: &str,
         body: &str,
-    ) -> Result<reqwest::RequestBuilder, WeaError>;
+    ) -> WeaResult<reqwest::RequestBuilder>;
     /// 发起请求同时会根据传入的类型返回对应的结果
     fn do_request<U: DeserializeOwned>(
         &self,
         url: &str,
         method: &str,
         body: &str,
-    ) -> impl Future<Output = Result<U, WeaError>>;
+    ) -> impl Future<Output = WeaResult<U>>;
     /// method format like alipay.trade.app.pay
     fn get_uri(&self, method: &str) -> String;
     /// 验证签名
@@ -76,11 +73,11 @@ pub trait BaseTrait {
     /// ${alipay-timestamp}\n
     /// ${alipay-nonce}\n
     /// ${httpResponseBody}\n
-    fn verify_signature(&self, data: Vec<&str>, signature: &str) -> Result<bool, WeaError>;
+    fn verify_signature(&self, data: Vec<&str>, signature: &str) -> WeaResult<bool>;
     /// 加密
-    fn encrypt(&self, data: &str) -> Result<String, WeaError>;
+    fn encrypt(&self, data: &str) -> WeaResult<String>;
     /// 解密
-    fn decrypt(&self, data: &str) -> Result<String, WeaError>;
+    fn decrypt(&self, data: &str) -> WeaResult<String>;
 }
 
 impl BaseTrait for Payment<AlipayConfig> {
@@ -89,7 +86,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         &self,
         method: &str,
         data: ReqOrderBody,
-    ) -> impl Future<Output = Result<ResOrderBody, WeaError>> {
+    ) -> impl Future<Output = WeaResult<ResOrderBody>> {
         async move {
             let url = self.get_uri(method);
             let data = match data.notify_url {
@@ -105,10 +102,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         }
     }
     //query order
-    fn query_order(
-        &self,
-        out_trade_no: &str,
-    ) -> impl Future<Output = Result<ResOrderBody, WeaError>> {
+    fn query_order(&self, out_trade_no: &str) -> impl Future<Output = WeaResult<ResOrderBody>> {
         async move {
             let url = self.get_uri("alipay.trade.query");
             let order_body = serde_json::to_string(&ReqQueryOrderBody {
@@ -123,7 +117,7 @@ impl BaseTrait for Payment<AlipayConfig> {
     fn query_order_by_trade_no(
         &self,
         trade_no: &str,
-    ) -> impl Future<Output = Result<ResOrderBody, WeaError>> {
+    ) -> impl Future<Output = WeaResult<ResOrderBody>> {
         async move {
             let url = self.get_uri("alipay.trade.query");
             let order_body = serde_json::to_string(&ReqQueryOrderBody {
@@ -138,7 +132,7 @@ impl BaseTrait for Payment<AlipayConfig> {
     fn close_order(
         &self,
         body: ReqCloseOrderBody,
-    ) -> impl Future<Output = Result<ResCloseOrderBody, WeaError>> {
+    ) -> impl Future<Output = WeaResult<ResCloseOrderBody>> {
         async move {
             let url = self.get_uri("alipay.trade.close");
             let order_body = serde_json::to_string(&body)?;
@@ -150,7 +144,7 @@ impl BaseTrait for Payment<AlipayConfig> {
     fn cancel_order(
         &self,
         body: ReqCancelOrderBody,
-    ) -> impl Future<Output = Result<ResCancelOrderBody, WeaError>> {
+    ) -> impl Future<Output = WeaResult<ResCancelOrderBody>> {
         async move {
             let url = self.get_uri("alipay.trade.cancel");
             let order_body = serde_json::to_string(&body)?;
@@ -159,7 +153,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         }
     }
     //pre_notify
-    fn notify(&self, query_str: &str) -> Result<NotifyOrderBody, WeaError> {
+    fn notify(&self, query_str: &str) -> WeaResult<NotifyOrderBody> {
         let tmp = "https://xx.com/?".to_string() + &query_str;
         let url = Url::parse(&tmp).map_err(|_e| e("parse url error"))?;
         let url = url.query_pairs();
@@ -206,7 +200,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         url: &str,
         method: &str,
         body: &str,
-    ) -> Result<reqwest::RequestBuilder, WeaError> {
+    ) -> WeaResult<reqwest::RequestBuilder> {
         let is_sandbox = self.config.is_sandbox.unwrap_or(false);
         let base_url = match is_sandbox {
             false => "https://openapi.alipay.com",
@@ -289,7 +283,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         url: &str,
         method: &str,
         body: &str,
-    ) -> impl Future<Output = Result<U, WeaError>> {
+    ) -> impl Future<Output = WeaResult<U>> {
         async move {
             let req_builder = self.build_request_builder(url, method, body)?;
             let res = req_builder.send().await?;
@@ -335,7 +329,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         }
     }
     // verify_signature
-    fn verify_signature(&self, data: Vec<&str>, signature: &str) -> Result<bool, WeaError> {
+    fn verify_signature(&self, data: Vec<&str>, signature: &str) -> WeaResult<bool> {
         let data = if data.len() == 1 {
             data[0].to_string()
         } else {
@@ -367,7 +361,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         Ok(result)
     }
     //encrypt
-    fn encrypt(&self, data: &str) -> Result<String, WeaError> {
+    fn encrypt(&self, data: &str) -> WeaResult<String> {
         let mch_key = self.config.mch_key.clone();
         if mch_key.is_none() {
             return Err(e("mch_key is none"));
@@ -391,7 +385,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         Ok(encode_block(ct))
     }
     //decrypt
-    fn decrypt(&self, data: &str) -> Result<String, WeaError> {
+    fn decrypt(&self, data: &str) -> WeaResult<String> {
         let mch_key = self.config.mch_key.clone();
         if mch_key.is_none() {
             return Err(e("mch_key is none"));

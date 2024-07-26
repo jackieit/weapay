@@ -13,6 +13,9 @@ pub mod utils;
 pub mod wechat;
 // reqwest 请求 user-agent
 const SDK_UA: &str = "Weapay rust sdk/0.1.0";
+
+//pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = WeaResult<T>> + Send + 'a>>;
+
 /// 微信支付配置
 /// 查看 [接入前准备](https://pay.weixin.qq.com/wiki/doc/apiv3/open/pay/chapter5_5_2.shtml#doc-main)
 /// 服务商模式下,app_id = sub_appid, mchid = sub_mchid
