@@ -2,6 +2,10 @@
 name = "weapay"
 version = "0.1.0"
 edition = "2021"
+authors = ["Jackie <wfits@126.com>"]
+description = "A Rust SDK for Alipay and WeChat Pay based on v3"
+keywords = ["alipay","wechat","v3"]
+repository = "https://github.com/jackieit/weapay"
 
 [dependencies]
 aes = "0.8.4"
