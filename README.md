@@ -2,8 +2,7 @@
 wechat pay v3 and alipay v3 rust pay
 支持微信支付和支付宝支付rust sdk，两种支付方式均基于 v3
 包名称：weapay 意为 wechat pay & alipay
-目前仅在通过单元测试了普通商户的功能，
-代码目前处于开发阶段，且勿用于生产环境。
+目前仅在通过单元测试了普通商户的功能。
 # 微信签名验签
 1. 关于签名：微信支付签名规则参考[微信支付签名生成算法](https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_1.shtml)
 2. 关于验签：微信支付验签规则参考[微信支付验签](https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_2.shtml)
