@@ -2,3 +2,4 @@
 certs/
 /bill*
 /target
+Cargo.lock
