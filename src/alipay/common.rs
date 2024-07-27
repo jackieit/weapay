@@ -212,7 +212,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         let full_url = full_url.as_str();
         let timestamp = get_timestamp_millis()?.to_string();
         let nonce_str = generate_random_string(32);
-        let request_id = format!("{}-{}", generate_random_string(8), timestamp);
+        let request_id = generate_random_string(32);
         let is_cert_model = self.config.alipay_root_cert.is_some();
 
         //let alipay_root_serial_no = get_cert_serial(&self.config.alipay_root_cert.clone())?;
