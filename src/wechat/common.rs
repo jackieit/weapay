@@ -270,12 +270,29 @@ impl BaseTrait for Payment<WechatConfig> {
             let res = req_builder.send()
             .await?;
             let status_code = res.status();
+            //let headers = res.headers().clone();
+            let res = res.text().await?;
+            //@todo verify signature
+            /* 
+            let mut verify_data: Vec<&str> = vec![];
+            let sn = headers.get("Wechatpay-Serial").unwrap().to_str()?;
+   
+            let timestamp = headers.get("Wechatpay-Timestamp").unwrap().to_str()?;
+            verify_data.push(timestamp);
+            let nonce = headers.get("Wechatpay-Nonce").unwrap().to_str()?;
+            verify_data.push(nonce);
+            verify_data.push(&res);
+            let signature = headers.get("Wechatpay-Signature").unwrap().to_str()?;
+            let signed = self.verify_signature(verify_data, signature,sn).await?;
+            if !signed {
+                return Err(e("signature verify error"));
+            }*/
             if status_code == 200 || status_code == 204{
-                let res = res.text().await?;
+                //let res = res.text().await?;
                 let res: U = serde_json::from_str(&res.clone())?;
                 return Ok(res);
             } else {
-                let res = res.text().await?;
+                //let res = res.text().await?;
                 if res.is_empty() {
                     return Err(e(&status_code.to_string()));
                 }
