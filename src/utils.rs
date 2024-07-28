@@ -1,4 +1,4 @@
-use crate::error::WeaError;
+use crate::error::{WeaResult,WeaError};
 use openssl::{
     base64::{decode_block, encode_block},
     hash::{hash, MessageDigest},
@@ -14,7 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 生成签名 data: vec!['GET', 'https://xxx', '1395712654', 'nonce_str', 'body']
 /// private_key: 商户私钥,支付宝提供的私钥可能没有 begin-- end 手动加上。注意两端不要有空格
-pub(crate) fn generate_signature(data: Vec<&str>, private_key: &str) -> Result<String, WeaError> {
+pub(crate) fn generate_signature(data: Vec<&str>, private_key: &str) -> WeaResult<String> {
     let data = data.join("\n");
     let data = data + "\n";
     let private_key_content = std::fs::read_to_string(private_key)?;
@@ -53,14 +53,14 @@ pub(crate) fn generate_random_string(len: usize) -> String {
     random_string
 }
 // get current unix timestamp
-pub(crate) fn get_timestamp() -> Result<u64, WeaError> {
+pub(crate) fn get_timestamp() -> WeaResult<u64> {
     let start = SystemTime::now();
     let since_the_epoch = start.duration_since(UNIX_EPOCH)?;
     let timestamp = since_the_epoch.as_secs();
     Ok(timestamp)
 }
 // 获取当前 Unix 时间戳的毫秒数
-pub(crate) fn get_timestamp_millis() -> Result<u128, WeaError> {
+pub(crate) fn get_timestamp_millis() -> WeaResult<u128> {
     let start = SystemTime::now();
     let since_the_epoch = start.duration_since(UNIX_EPOCH)?;
     let timestamp_millis = since_the_epoch.as_millis();
@@ -71,20 +71,20 @@ pub(crate) fn e(message: &str) -> WeaError {
     WeaError::new("".to_string(), message.to_string())
 }
 // get cert serial number usedby wechat pay
-pub(crate) fn get_cert_serial(cert: &str) -> Result<String, WeaError> {
+pub(crate) fn get_cert_serial(cert: &str) -> WeaResult<String> {
     let cert = std::fs::read(cert)?;
     let cert = X509::stack_from_pem(&cert)?;
     let cert = cert[0].serial_number().to_bn()?.to_hex_str()?.to_string();
     Ok(cert)
 }
 // get cert sn by cert file by alipay
-pub(crate) fn get_cert_sn(cert: &str) -> Result<String, WeaError> {
+pub(crate) fn get_cert_sn(cert: &str) -> WeaResult<String> {
     let cert = std::fs::read_to_string(cert)?;
 
     get_cert_sn_by_content(cert.as_ref())
 }
 // get cert cert sn content used by alipay
-pub(crate) fn get_cert_sn_by_content(cert_content: &[u8]) -> Result<String, WeaError> {
+pub(crate) fn get_cert_sn_by_content(cert_content: &[u8]) -> WeaResult<String> {
     //let cert_content = std::fs::read(cert_content)?;
     let cert = X509::from_pem(cert_content).unwrap();
     /* */
@@ -136,6 +136,7 @@ pub(crate) fn get_root_cert_sn(cert_content: &str) -> Result<String, WeaError> {
         .join("_");
     Ok(root_cert_sn)
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
