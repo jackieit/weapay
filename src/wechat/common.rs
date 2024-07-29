@@ -180,7 +180,21 @@ impl BaseTrait for Payment<WechatConfig> {
         let url = "/v3/certificates";
         let url = self.get_uri(url,false,false);
         async move {
-            let res:RespCert = self.do_request::<RespCert>(&url, "GET", "").await?;
+            let req_builder = self.build_request_builder(&url, "GET", "")?;
+            let res = req_builder.send().await?;
+            let status_code = res.status();
+            let res_text = res.text().await?;
+            let res = if status_code == 200 || status_code == 204{
+                let res: RespCert = serde_json::from_str(&res_text)?;
+                res
+                //return Ok(res);
+            } else {
+                if res_text.is_empty() {
+                    return Err(e(&status_code.to_string()));
+                }
+                return Err(e(&res_text));
+            };
+            //let res:RespCert = self.do_request::<RespCert>(&url, "GET", "").await?;
             let data = res.data;
             if data.len() == 0 {
                 return Err(e("certificates is empty"));
@@ -270,10 +284,10 @@ impl BaseTrait for Payment<WechatConfig> {
             let res = req_builder.send()
             .await?;
             let status_code = res.status();
-            //let headers = res.headers().clone();
+            let headers = res.headers().clone();
             let res = res.text().await?;
             //@todo verify signature
-            /* 
+             
             let mut verify_data: Vec<&str> = vec![];
             let sn = headers.get("Wechatpay-Serial").unwrap().to_str()?;
    
@@ -286,7 +300,7 @@ impl BaseTrait for Payment<WechatConfig> {
             let signed = self.verify_signature(verify_data, signature,sn).await?;
             if !signed {
                 return Err(e("signature verify error"));
-            }*/
+            }
             if status_code == 200 || status_code == 204{
                 //let res = res.text().await?;
                 let res: U = serde_json::from_str(&res.clone())?;
