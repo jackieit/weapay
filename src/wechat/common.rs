@@ -1,4 +1,4 @@
-use std::{time::Duration,fs,path};
+use std::{fs,path};
 use std::future::Future;
 use openssl::{
     base64::decode_block, hash::MessageDigest, sign::Verifier, x509::X509
@@ -206,16 +206,16 @@ impl BaseTrait for Payment<WechatConfig> {
                 let dir = env!("CARGO_MANIFEST_DIR");
                 let save_path = format!("{}/certs/download/",dir);
                 let cert_path = format!("{}{}.pem",save_path,serial_no);
-                let cert_file  = path::Path::new(&cert_path);
-                if  cert_file.is_file()  {
-                    let mtime = fs::metadata(cert_file)?
-                                            .modified()?
-                                            .elapsed()?;
-                    if mtime < Duration::from_secs(12*3600) {
-                        cert_files.push(cert_path);
-                        continue;
-                    }
-                }
+                //let cert_file  = path::Path::new(&cert_path);
+                // if  cert_file.is_file()  {
+                //     let mtime = fs::metadata(cert_file)?
+                //                             .modified()?
+                //                             .elapsed()?;
+                //     if mtime < Duration::from_secs(12*3600) {
+                //         cert_files.push(cert_path);
+                //         continue;
+                //     }
+                // }
                 if !path::Path::new(&save_path).exists() {
                     fs::create_dir_all(&save_path)?;
                 } 
@@ -347,12 +347,18 @@ impl BaseTrait for Payment<WechatConfig> {
         let data = data + "\n";
         async move {
             //print!("验证签名数据====>\n{}",data);
-            let cert_files = self.download_cert().await?;
-            let cert_file = cert_files.iter().find(|&x| x.contains(serial));
-            if cert_file.is_none() {
-                return Err(e("cert file not found"));
-            }
-            let cert_file = cert_file.unwrap();
+            let cert_file = if let Some(cert_file) = list_wechat_certs(serial)? {
+                cert_file
+            } else {
+                let cert_files = self.download_cert().await?;
+                let find_result = cert_files.iter().find(|&x| x.contains(serial));
+                if let Some(find_result) = find_result {
+                    find_result.to_string()
+                } else {
+                    return Err(e("cert file not found"));
+                }
+            };
+         
             let apiclient_cert = fs::read_to_string(cert_file)?;
             let app_cert = X509::from_pem(apiclient_cert.as_bytes())?;
 
@@ -507,7 +513,6 @@ mod tests {
             let result = result.unwrap();
             println!("{:?}", result);
             assert_eq!(result.out_trade_no, "T20240407001");
-            
         }
         let result = payment.query_order_by_transaction_id("4200002321202407011113597346").await;
         if result.is_err() {

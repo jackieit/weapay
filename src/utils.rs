@@ -1,4 +1,4 @@
-use crate::error::{WeaResult,WeaError};
+use crate::error::{WeaError, WeaResult};
 use openssl::{
     base64::{decode_block, encode_block},
     hash::{hash, MessageDigest},
@@ -10,7 +10,8 @@ use openssl::{
     sign::Signer,
     x509::X509,
 };
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{fs, path::Path};
 
 /// 生成签名 data: vec!['GET', 'https://xxx', '1395712654', 'nonce_str', 'body']
 /// private_key: 商户私钥,支付宝提供的私钥可能没有 begin-- end 手动加上。注意两端不要有空格
@@ -136,6 +137,26 @@ pub(crate) fn get_root_cert_sn(cert_content: &str) -> Result<String, WeaError> {
         .join("_");
     Ok(root_cert_sn)
 }
+/// list all wechat platform certs,if sn is not none,return only return
+/// if sn is not none,return only return the match cert
+pub(crate) fn list_wechat_certs(sn: &str) -> WeaResult<Option<String>> {
+    let cert_dir = format!("{}/certs/download/", env!("CARGO_MANIFEST_DIR"));
+    //println!("cert_dir==={}", cert_dir);
+    if !Path::exists(Path::new(&cert_dir)) {
+        return Ok(None);
+    }
+    let cert_files = std::fs::read_dir(cert_dir)?;
+    for cert_file in cert_files {
+        let cert_file = cert_file?;
+        let path = cert_file.path();
+        let path_str = path.to_str().unwrap();
+        let mtime = fs::metadata(path.clone())?.modified()?.elapsed()?;
+        if mtime < Duration::from_secs(12 * 3600) && path_str.contains(sn) {
+            return Ok(Some(path_str.to_string()));
+        }
+    }
+    Ok(None)
+}
 
 #[cfg(test)]
 mod tests {
@@ -159,5 +180,12 @@ mod tests {
         let random_string = generate_random_string(32);
         println!("random_string==={}", random_string);
         assert_eq!(random_string.len(), 32);
+    }
+    // test list wechat certs
+    #[test]
+    fn test_list_wechat_certs() {
+        let certs = list_wechat_certs("5AD141C1086A7945A1394A8AEAA9EB0619751859").unwrap();
+        println!("certs==={:?}", certs);
+        // assert_eq!(certs.len(), 0);
     }
 }
