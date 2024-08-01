@@ -18,7 +18,11 @@
 //! 支付宝公钥证书：用来验证支付宝消息，包含了支付宝公钥、支付宝公司名称、证书有效期等内容，一般有效期为 5 年。
 //! 支付宝根证书：用来验证支付宝消息，包含了根 CA 名称、根 CA 的公钥、证书有效期等内容。
 
+use crate::error::WeaError;
 use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
+
 pub mod alipay;
 pub mod error;
 pub mod utils;
@@ -27,6 +31,8 @@ pub mod wechat;
 const SDK_UA: &str = "Weapay rust sdk/0.1.0";
 
 //pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = WeaResult<T>> + Send + 'a>>;
+pub type WeaResult<T> = Result<T, WeaError>;
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = WeaResult<T>> + Send + 'a>>;
 
 /// 微信支付配置
 /// 查看 [接入前准备](https://pay.weixin.qq.com/wiki/doc/apiv3/open/pay/chapter5_5_2.shtml#doc-main)

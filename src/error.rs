@@ -63,5 +63,3 @@ impl From<AesError> for WeaError {
         WeaError::new("Aes".to_string(), err.to_string())
     }
 }
-
-pub type WeaResult<T> = Result<T, WeaError>;

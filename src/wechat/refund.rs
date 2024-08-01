@@ -1,15 +1,14 @@
-use crate::error::WeaResult;
 use crate::wechat::prelude::*;
+use crate::BoxFuture;
 use crate::*;
-use std::future::Future;
 pub trait RefundTrait {
     /// 申请退款
-    fn refund(&self, data: ReqRefundOrder) -> impl Future<Output = WeaResult<RefundResponse>>;
+    fn refund(&self, data: ReqRefundOrder) -> BoxFuture<RefundResponse>;
     /// 查询退款
-    fn query_refund(&self, out_refund_no: &str) -> impl Future<Output = WeaResult<RefundResponse>>;
+    fn query_refund(&self, out_refund_no: &str) -> BoxFuture<RefundResponse>;
 }
 impl RefundTrait for Payment<WechatConfig> {
-    fn refund(&self, data: ReqRefundOrder) -> impl Future<Output = WeaResult<RefundResponse>> {
+    fn refund(&self, data: ReqRefundOrder) -> BoxFuture<RefundResponse> {
         let mut new_data: ReqRefundOrder;
         if self.is_sp() {
             new_data = ReqRefundOrder {
@@ -22,17 +21,17 @@ impl RefundTrait for Payment<WechatConfig> {
         if new_data.notify_url.is_none() {
             new_data.notify_url = Some(self.config.notify_url.clone());
         }
-        async move {
+        Box::pin(async move {
             let refund_body = serde_json::to_string(&new_data)?;
             let url = self.get_uri("/v3/refund/domestic/refunds", false, false);
             self.do_request::<RefundResponse>(&url, "POST", &refund_body)
                 .await
-        }
+        })
     }
-    fn query_refund(&self, out_refund_no: &str) -> impl Future<Output = WeaResult<RefundResponse>> {
+    fn query_refund(&self, out_refund_no: &str) -> BoxFuture<RefundResponse> {
         let url = format!("/v3/refund/domestic/refunds/{}", out_refund_no);
         let url = self.get_uri(&url, true, false);
-        async move { self.do_request::<RefundResponse>(&url, "GET", "").await }
+        Box::pin(async move { self.do_request::<RefundResponse>(&url, "GET", "").await })
     }
 }
 #[cfg(test)]

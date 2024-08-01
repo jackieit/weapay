@@ -1,5 +1,4 @@
 use std::{fs,path};
-use std::future::Future;
 use openssl::{
     base64::decode_block, hash::MessageDigest, sign::Verifier, x509::X509
 };
@@ -12,12 +11,11 @@ use serde::de::DeserializeOwned;
 use serde_json;
 use crate::*;
 use crate::utils::*;
-use crate::error::WeaResult;
 use crate::wechat::prelude::*;
 //微信支付trait
 pub trait BaseTrait {
     /// 商户系统先调用该接口在微信支付服务后台生成预支付交易单，返回正确的预支付交易会话标识后再按Native、JSAPI、APP等不同场景生成交易串调起支付。
-    fn create_order(&self,trade_type: TradeType,data: ReqOrderBody) -> impl Future<Output = WeaResult<CreateOrderResult>>;
+    fn create_order(&self,trade_type: TradeType,data: ReqOrderBody) -> BoxFuture<CreateOrderResult>;
     /// 支付通知数据验证签名数据解密,验证签名的nonce_str,timestamp,signture 来自于请求头
     /// 解密nonce 来自于resource,根据返回结果中的event_type来判断
     /// 支付通知 U为ResourceOrderBody，退款通知 U为ResourceRefundBody
@@ -28,19 +26,19 @@ pub trait BaseTrait {
     /// payment.notify::<ResourceOrderBody>(nonce_str, timestamp, body, signature,serial).await?;
     /// let notify = self.notify::<ResourceRefundBody>(nonce_str, timestamp, body, signature,serial).await?;
     /// ```
-    fn notify<U:DeserializeOwned>(&self,nonce_str: &str,timestamp: &str,body: &str,signature:&str,serial:&str) -> impl Future<Output = WeaResult<U>>;
+    fn notify<'a,U:DeserializeOwned + 'a>(&'a self,nonce_str: &'a str,timestamp: &'a str,body: &'a str,signature:&'a str,serial:&'a str) -> BoxFuture<U>;
     /// 根据商家订单号查询订单
-    fn query_order(&self,out_trade_no: &str) -> impl Future<Output = WeaResult<ResourceOrderBody>>;
+    fn query_order(&self,out_trade_no: &str) -> BoxFuture<ResourceOrderBody>;
     /// 根据微信支付订单号查询订单
-    fn query_order_by_transaction_id(&self,transaction_id: &str) -> impl Future<Output = WeaResult<ResourceOrderBody>>;
+    fn query_order_by_transaction_id(&self,transaction_id: &str) -> BoxFuture<ResourceOrderBody>;
     /// 关闭订单
-    fn close_order(&self,out_trade_no: &str) -> impl Future<Output = WeaResult<()>>;
+    fn close_order(&self,out_trade_no: &str) -> BoxFuture<()>;
     /// 下载证书
-    fn download_cert(&self) -> impl Future<Output = WeaResult<Vec<String>>>;
+    fn download_cert(&self) -> BoxFuture<Vec<String>>;
     /// 构建请求client 同时设置好请求头
     fn build_request_builder(&self,url: &str,method: &str,body: &str) -> WeaResult<reqwest::RequestBuilder>;
     /// 发起请求同时会根据传入的类型返回对应的结果
-    fn do_request<U:DeserializeOwned>(&self,url: &str,method: &str,body: &str) -> impl Future<Output= WeaResult<U>>;
+    fn do_request<'a, U:DeserializeOwned + 'a>(&'a self,url: &'a str,method: &'a str,body: &'a str) -> BoxFuture<U>;
     /// 判断是否是服务商模式
     fn is_sp(&self) -> bool;
     /// 获取请求uri服务商模式下uri前缀为/v3/pay/partner
@@ -49,14 +47,14 @@ pub trait BaseTrait {
     fn get_uri(&self,uri: &str,with_mchid:bool,with_sp:bool) -> String;
     /// 验证签名 
     /// data 为验证签名的数据  vec!['1395712654', 'nonce_str', 'body']
-    fn verify_signature(&self,data: Vec<&str>,signature:&str,serial:&str) -> impl Future<Output =  WeaResult<bool>>;
+    fn verify_signature<'a>(&'a self,data: Vec<&'a str>,signature:&'a str,serial:&'a str) -> BoxFuture<bool>;
     /// 解密内容
     fn decrypt_content(&self,nonce: &str,ciphertext: &str,associated_data: &str) -> WeaResult<String>;
 }
 
 impl BaseTrait for Payment<WechatConfig> {
-    fn create_order(&self,trade_type: TradeType, data: ReqOrderBody) -> impl Future<Output = WeaResult<CreateOrderResult>> {
-        async move {
+    fn create_order(&self,trade_type: TradeType, data: ReqOrderBody) -> BoxFuture<CreateOrderResult> {
+        let fut = async move {
             let url = match trade_type {
                 TradeType::JSAPI => "/v3/pay/transactions/jsapi",
                 TradeType::NATIVE => "/v3/pay/transactions/native",
@@ -129,11 +127,12 @@ impl BaseTrait for Payment<WechatConfig> {
                 _ => Ok(CreateOrderResult::Default(rs)),
                 
             }
-        }
+        };
+        Box::pin(fut)
  
     }
-    fn notify<U:DeserializeOwned>(&self,nonce_str: &str,timestamp: &str,body: &str,signature:&str,serial:&str) -> impl Future<Output = WeaResult<U>> {
-        async move {
+    fn notify<'a,U: DeserializeOwned + 'a>(&'a self,nonce_str: &'a str,timestamp: &'a str,body: &'a str,signature:&'a str,serial:&'a str) -> BoxFuture<U> {
+        let fut = async move {
             let is_valid = self.verify_signature(vec![timestamp, nonce_str,  body], signature,serial).await?;
             if !is_valid {
                 return Err(e("signature verify error"));
@@ -145,27 +144,30 @@ impl BaseTrait for Payment<WechatConfig> {
             let content = self.decrypt_content(&nonce,&ciphertext,&associated_data)?;
             let notify_resource = serde_json::from_str::<U>(&content)?;
             Ok(notify_resource)            
-        }
+        };
+        Box::pin(fut)
     }
-    fn query_order(&self,out_trade_no: &str) -> impl Future<Output = WeaResult<ResourceOrderBody>> {
+    fn query_order(&self,out_trade_no: &str) -> BoxFuture<ResourceOrderBody> {
         let url = format!("/v3/pay/transactions/out-trade-no/{}", out_trade_no);
         let url = self.get_uri(&url,true,true);
-        async move{
+        let fut = async move{
             self.do_request::<ResourceOrderBody>(&url, "GET", &"").await
-        }
+        };
+        Box::pin(fut)
     }
-    fn query_order_by_transaction_id(&self,transaction_id: &str) -> impl Future<Output = WeaResult<ResourceOrderBody>> {
+    fn query_order_by_transaction_id(&self,transaction_id: &str) -> BoxFuture<ResourceOrderBody> {
         let url = format!("/v3/pay/transactions/id/{}", transaction_id);
         let url = self.get_uri(&url,true,true);
-        async move{
+        let fut = async move{
             self.do_request::<ResourceOrderBody>(&url, "GET", &"").await
-        }
+        };
+        Box::pin(fut)
     }
-    fn close_order(&self,out_trade_no: &str) -> impl Future<Output = WeaResult<()>> {
+    fn close_order(&self,out_trade_no: &str) -> BoxFuture<()> {
         let mchid = self.config.mchid.clone();
         let url = format!("/v3/pay/transactions/out-trade-no/{}/close", out_trade_no);
         let url = self.get_uri(&url,false,false);
-        async move{
+        let fut = async move{
         let body: String;
             if self.is_sp() {
                 body = format!("{{\"sp_mchid\":\"{}\",\"sub_mchid\":\"{}\"}}",self.config.sp_mchid.clone().unwrap(),mchid);
@@ -173,13 +175,14 @@ impl BaseTrait for Payment<WechatConfig> {
                 body = format!("{{\"mchid\":\"{}\"}}",mchid);
             }
             self.do_request::<()>(&url, "POST", &body).await            
-        }
+        };
+        Box::pin(fut)
 
     }
-    fn download_cert(&self) -> impl Future<Output = WeaResult<Vec<String>>> {
+    fn download_cert(&self) -> BoxFuture<Vec<String>> {
         let url = "/v3/certificates";
         let url = self.get_uri(url,false,false);
-        async move {
+        let fut = async move {
             let req_builder = self.build_request_builder(&url, "GET", "")?;
             let res = req_builder.send().await?;
             let status_code = res.status();
@@ -234,7 +237,8 @@ impl BaseTrait for Payment<WechatConfig> {
                 cert_files.push(cert_path);
             }
             Ok(cert_files)
-        }
+        };
+        Box::pin(fut)
     }
     /// build request client
     fn build_request_builder(&self,url: &str,method: &str,body: &str) -> WeaResult<reqwest::RequestBuilder> {
@@ -277,9 +281,9 @@ impl BaseTrait for Payment<WechatConfig> {
         
     }
     // do request
-    fn do_request<U:DeserializeOwned>(&self,url: &str,method: &str,body: &str) ->  impl Future<Output= WeaResult<U>> {
+    fn do_request<'a, U:DeserializeOwned+ 'a>(&'a self,url: &'a str,method: &'a str,body: &'a str) ->  BoxFuture<U> {
        
-        async move {
+        let fut = async move {
             let req_builder = self.build_request_builder(url,method,body)?;
             let res = req_builder.send()
             .await?;
@@ -312,7 +316,8 @@ impl BaseTrait for Payment<WechatConfig> {
                 }
                 return Err(e(&res));
             }
-        }
+        };
+        Box::pin(fut)
     }
     fn is_sp(&self) -> bool {
         self.config.sp_appid.is_some() && self.config.sp_mchid.is_some()
@@ -342,15 +347,18 @@ impl BaseTrait for Payment<WechatConfig> {
         }
     }
     // verify signature
-    fn verify_signature(&self, data: Vec<&str>, signature: &str, serial:&str) -> impl Future<Output = WeaResult<bool>> {
+    fn verify_signature<'a>(&'a self, data: Vec<&'a str>, signature: &'a str, serial:&'a str) -> BoxFuture<bool> {
         let data = data.join("\n");
         let data = data + "\n";
-        async move {
+        
+        let fut = async move {
+          
             //print!("验证签名数据====>\n{}",data);
             let cert_file = if let Some(cert_file) = list_wechat_certs(serial)? {
                 cert_file
             } else {
-                let cert_files = self.download_cert().await?;
+                //let cert_files = self.download_cert().await?;
+                let cert_files: Vec<String> = vec![];
                 let find_result = cert_files.iter().find(|&x| x.contains(serial));
                 if let Some(find_result) = find_result {
                     find_result.to_string()
@@ -358,7 +366,6 @@ impl BaseTrait for Payment<WechatConfig> {
                     return Err(e("cert file not found"));
                 }
             };
-         
             let apiclient_cert = fs::read_to_string(cert_file)?;
             let app_cert = X509::from_pem(apiclient_cert.as_bytes())?;
 
@@ -368,7 +375,8 @@ impl BaseTrait for Payment<WechatConfig> {
             verifier.update(data.as_bytes())?;
             let result = verifier.verify(&sign_u8)?;
             Ok(result)
-        }
+        };
+        Box::pin(fut)
     }
     // decrypt content
     fn decrypt_content(&self,nonce: &str,ciphertext: &str,associated_data: &str) -> WeaResult<String> {

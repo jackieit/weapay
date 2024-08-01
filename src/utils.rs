@@ -1,4 +1,5 @@
-use crate::error::{WeaError, WeaResult};
+use crate::error::WeaError;
+use crate::WeaResult;
 use openssl::{
     base64::{decode_block, encode_block},
     hash::{hash, MessageDigest},

@@ -1,5 +1,4 @@
 use crate::alipay::prelude::*;
-use crate::error::WeaResult;
 use crate::utils::*;
 use crate::*;
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
@@ -14,34 +13,20 @@ use openssl::{
 use reqwest::Url;
 use serde::de::DeserializeOwned;
 use serde_json;
-use std::future::Future;
 use std::{collections::HashMap, fs};
 
 pub trait BaseTrait {
     /// create order
     /// method format like alipay.trade.app.pay
-    fn create_order(
-        &self,
-        method: &str,
-        data: ReqOrderBody,
-    ) -> impl Future<Output = WeaResult<ResOrderBody>>;
+    fn create_order<'a>(&'a self, method: &'a str, data: ReqOrderBody) -> BoxFuture<ResOrderBody>;
     /// 查询订单
-    fn query_order(&self, out_trade_no: &str) -> impl Future<Output = WeaResult<ResOrderBody>>;
+    fn query_order<'a>(&'a self, out_trade_no: &'a str) -> BoxFuture<ResOrderBody>;
     /// 查询订单支付宝订单号
-    fn query_order_by_trade_no(
-        &self,
-        trade_no: &str,
-    ) -> impl Future<Output = WeaResult<ResOrderBody>>;
+    fn query_order_by_trade_no<'a>(&'a self, trade_no: &'a str) -> BoxFuture<ResOrderBody>;
     /// 关闭订单
-    fn close_order(
-        &self,
-        body: ReqCloseOrderBody,
-    ) -> impl Future<Output = WeaResult<ResCloseOrderBody>>;
+    fn close_order(&self, body: ReqCloseOrderBody) -> BoxFuture<ResCloseOrderBody>;
     /// 撤销订单
-    fn cancel_order(
-        &self,
-        body: ReqCancelOrderBody,
-    ) -> impl Future<Output = WeaResult<ResCancelOrderBody>>;
+    fn cancel_order(&self, body: ReqCancelOrderBody) -> BoxFuture<ResCancelOrderBody>;
     /// 预处理异步通知此方法仅针对异步URL通知的数据进行验签
     /// 如当面付的预下单通知，APP支付的异步通知等
     fn notify(&self, query_str: &str) -> WeaResult<NotifyOrderBody>;
@@ -54,12 +39,12 @@ pub trait BaseTrait {
         body: &str,
     ) -> WeaResult<reqwest::RequestBuilder>;
     /// 发起请求同时会根据传入的类型返回对应的结果
-    fn do_request<U: DeserializeOwned>(
-        &self,
-        url: &str,
-        method: &str,
-        body: &str,
-    ) -> impl Future<Output = WeaResult<U>>;
+    fn do_request<'a, U: DeserializeOwned + 'a>(
+        &'a self,
+        url: &'a str,
+        method: &'a str,
+        body: &'a str,
+    ) -> BoxFuture<U>;
     /// method format like alipay.trade.app.pay
     fn get_uri(&self, method: &str) -> String;
     /// 验证签名
@@ -82,12 +67,8 @@ pub trait BaseTrait {
 
 impl BaseTrait for Payment<AlipayConfig> {
     //create order
-    fn create_order(
-        &self,
-        method: &str,
-        data: ReqOrderBody,
-    ) -> impl Future<Output = WeaResult<ResOrderBody>> {
-        async move {
+    fn create_order<'a>(&'a self, method: &'a str, data: ReqOrderBody) -> BoxFuture<ResOrderBody> {
+        let fut = async move {
             let url = self.get_uri(method);
             let data = match data.notify_url {
                 Some(_) => data,
@@ -99,11 +80,12 @@ impl BaseTrait for Payment<AlipayConfig> {
             let order_body = serde_json::to_string(&data)?;
             self.do_request::<ResOrderBody>(&url, &"POST", &order_body)
                 .await
-        }
+        };
+        Box::pin(fut)
     }
     //query order
-    fn query_order(&self, out_trade_no: &str) -> impl Future<Output = WeaResult<ResOrderBody>> {
-        async move {
+    fn query_order<'a>(&'a self, out_trade_no: &'a str) -> BoxFuture<ResOrderBody> {
+        let fut = async move {
             let url = self.get_uri("alipay.trade.query");
             let order_body = serde_json::to_string(&ReqQueryOrderBody {
                 out_trade_no: Some(out_trade_no.to_string()),
@@ -111,14 +93,12 @@ impl BaseTrait for Payment<AlipayConfig> {
             })?;
             self.do_request::<ResOrderBody>(&url, &"POST", &order_body)
                 .await
-        }
+        };
+        Box::pin(fut)
     }
     // query order by trade_no
-    fn query_order_by_trade_no(
-        &self,
-        trade_no: &str,
-    ) -> impl Future<Output = WeaResult<ResOrderBody>> {
-        async move {
+    fn query_order_by_trade_no<'a>(&'a self, trade_no: &'a str) -> BoxFuture<ResOrderBody> {
+        let fut = async move {
             let url = self.get_uri("alipay.trade.query");
             let order_body = serde_json::to_string(&ReqQueryOrderBody {
                 trade_no: Some(trade_no.to_string()),
@@ -126,31 +106,28 @@ impl BaseTrait for Payment<AlipayConfig> {
             })?;
             self.do_request::<ResOrderBody>(&url, &"POST", &order_body)
                 .await
-        }
+        };
+        Box::pin(fut)
     }
     //close order
-    fn close_order(
-        &self,
-        body: ReqCloseOrderBody,
-    ) -> impl Future<Output = WeaResult<ResCloseOrderBody>> {
-        async move {
+    fn close_order(&self, body: ReqCloseOrderBody) -> BoxFuture<ResCloseOrderBody> {
+        let fut = async move {
             let url = self.get_uri("alipay.trade.close");
             let order_body = serde_json::to_string(&body)?;
             self.do_request::<ResCloseOrderBody>(&url, &"POST", &order_body)
                 .await
-        }
+        };
+        Box::pin(fut)
     }
     //cancel order
-    fn cancel_order(
-        &self,
-        body: ReqCancelOrderBody,
-    ) -> impl Future<Output = WeaResult<ResCancelOrderBody>> {
-        async move {
+    fn cancel_order(&self, body: ReqCancelOrderBody) -> BoxFuture<ResCancelOrderBody> {
+        let fut = async move {
             let url = self.get_uri("alipay.trade.cancel");
             let order_body = serde_json::to_string(&body)?;
             self.do_request::<ResCancelOrderBody>(&url, &"POST", &order_body)
                 .await
-        }
+        };
+        Box::pin(fut)
     }
     //pre_notify
     fn notify(&self, query_str: &str) -> WeaResult<NotifyOrderBody> {
@@ -278,22 +255,23 @@ impl BaseTrait for Payment<AlipayConfig> {
         Ok(req_builder)
     }
     // do request
-    fn do_request<U: DeserializeOwned>(
-        &self,
-        url: &str,
-        method: &str,
-        body: &str,
-    ) -> impl Future<Output = WeaResult<U>> {
-        async move {
+    fn do_request<'a, U: DeserializeOwned + 'a>(
+        &'a self,
+        url: &'a str,
+        method: &'a str,
+        body: &'a str,
+    ) -> BoxFuture<U> {
+        let fut = async move {
             let req_builder = self.build_request_builder(url, method, body)?;
             let res = req_builder.send().await?;
             let status_code = res.status();
             let headers = res.headers().clone();
             let res = res.text().await?;
             let is_cert_model = self.config.alipay_root_cert.is_some();
-            if is_cert_model {
+            let sn = headers.get("alipay-sn");
+            if is_cert_model && sn.is_some() {
                 let mut verify_data: Vec<&str> = vec![];
-                let sn = headers.get("alipay-sn").unwrap().to_str()?;
+                let sn = sn.unwrap().to_str()?;
                 let alipay_public_cert_sn = get_cert_sn(&self.config.alipay_public_cert.clone())?;
                 if sn != alipay_public_cert_sn {
                     return Err(e("alipay-sn is not match"));
@@ -326,7 +304,8 @@ impl BaseTrait for Payment<AlipayConfig> {
                 }
                 return Err(e(&res));
             }
-        }
+        };
+        Box::pin(fut)
     }
     // verify_signature
     fn verify_signature(&self, data: Vec<&str>, signature: &str) -> WeaResult<bool> {
