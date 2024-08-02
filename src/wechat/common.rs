@@ -26,7 +26,7 @@ pub trait BaseTrait {
     /// payment.notify::<ResourceOrderBody>(nonce_str, timestamp, body, signature,serial).await?;
     /// let notify = self.notify::<ResourceRefundBody>(nonce_str, timestamp, body, signature,serial).await?;
     /// ```
-    fn notify<'a,U:DeserializeOwned + 'a>(&'a self,nonce_str: &'a str,timestamp: &'a str,body: &'a str,signature:&'a str,serial:&'a str) -> BoxFuture<U>;
+    fn notify<'a,U:DeserializeOwned>(&'a self,nonce_str: &'a str,timestamp: &'a str,body: &'a str,signature:&'a str,serial:&'a str) -> BoxFuture<U>;
     /// 根据商家订单号查询订单
     fn query_order(&self,out_trade_no: &str) -> BoxFuture<ResourceOrderBody>;
     /// 根据微信支付订单号查询订单
@@ -38,7 +38,7 @@ pub trait BaseTrait {
     /// 构建请求client 同时设置好请求头
     fn build_request_builder(&self,url: &str,method: &str,body: &str) -> WeaResult<reqwest::RequestBuilder>;
     /// 发起请求同时会根据传入的类型返回对应的结果
-    fn do_request<'a, U:DeserializeOwned + 'a>(&'a self,url: &'a str,method: &'a str,body: &'a str) -> BoxFuture<U>;
+    fn do_request<'a, U:DeserializeOwned>(&'a self,url: &'a str,method: &'a str,body: &'a str) -> BoxFuture<U>;
     /// 判断是否是服务商模式
     fn is_sp(&self) -> bool;
     /// 获取请求uri服务商模式下uri前缀为/v3/pay/partner
@@ -131,7 +131,7 @@ impl BaseTrait for Payment<WechatConfig> {
         Box::pin(fut)
  
     }
-    fn notify<'a,U: DeserializeOwned + 'a>(&'a self,nonce_str: &'a str,timestamp: &'a str,body: &'a str,signature:&'a str,serial:&'a str) -> BoxFuture<U> {
+    fn notify<'a,U: DeserializeOwned>(&'a self,nonce_str: &'a str,timestamp: &'a str,body: &'a str,signature:&'a str,serial:&'a str) -> BoxFuture<U> {
         let fut = async move {
             let is_valid = self.verify_signature(vec![timestamp, nonce_str,  body], signature,serial).await?;
             if !is_valid {
@@ -281,7 +281,7 @@ impl BaseTrait for Payment<WechatConfig> {
         
     }
     // do request
-    fn do_request<'a, U:DeserializeOwned+ 'a>(&'a self,url: &'a str,method: &'a str,body: &'a str) ->  BoxFuture<U> {
+    fn do_request<'a, U:DeserializeOwned>(&'a self,url: &'a str,method: &'a str,body: &'a str) ->  BoxFuture<U> {
        
         let fut = async move {
             let req_builder = self.build_request_builder(url,method,body)?;

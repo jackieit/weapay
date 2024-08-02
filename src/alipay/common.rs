@@ -39,7 +39,7 @@ pub trait BaseTrait {
         body: &str,
     ) -> WeaResult<reqwest::RequestBuilder>;
     /// 发起请求同时会根据传入的类型返回对应的结果
-    fn do_request<'a, U: DeserializeOwned + 'a>(
+    fn do_request<'a, U: DeserializeOwned>(
         &'a self,
         url: &'a str,
         method: &'a str,
@@ -255,7 +255,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         Ok(req_builder)
     }
     // do request
-    fn do_request<'a, U: DeserializeOwned + 'a>(
+    fn do_request<'a, U: DeserializeOwned>(
         &'a self,
         url: &'a str,
         method: &'a str,
