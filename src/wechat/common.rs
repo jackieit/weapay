@@ -357,8 +357,8 @@ impl BaseTrait for Payment<WechatConfig> {
             let cert_file = if let Some(cert_file) = list_wechat_certs(serial)? {
                 cert_file
             } else {
-                //let cert_files = self.download_cert().await?;
-                let cert_files: Vec<String> = vec![];
+                let cert_files = self.download_cert().await?;
+                //let cert_files: Vec<String> = vec![];
                 let find_result = cert_files.iter().find(|&x| x.contains(serial));
                 if let Some(find_result) = find_result {
                     find_result.to_string()
