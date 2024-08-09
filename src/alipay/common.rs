@@ -352,7 +352,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         let iv = [0u8; 16];
         let buf_len = pt_len + (16 - pt_len % 16);
         let mut buf = vec![0u8; buf_len];
-        let mut buf = buf.as_mut_slice();
+        //let mut buf = buf.as_mut_slice();
         let data = data.as_bytes();
         //let pt_len = data.len();
         buf[..pt_len].copy_from_slice(data);
@@ -380,7 +380,7 @@ impl BaseTrait for Payment<AlipayConfig> {
         let pt = Aes128CbcDec::new_from_slices(mch_key, &iv).unwrap();
         let buf_len = data.len() + (16 - data.len() % 16);
         let mut buf = vec![0u8; buf_len];
-        let mut buf = buf.as_mut_slice();
+        //let mut buf = buf.as_mut_slice();
         // let mut buf = [0u8; 1024];
         let pt = pt
             .decrypt_padded_b2b_mut::<Pkcs7>(data, &mut buf)
