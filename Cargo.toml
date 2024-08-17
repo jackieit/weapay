@@ -6,7 +6,8 @@ authors = ["Jackie <wfits@126.com>"]
 description = "A Rust SDK for Alipay and WeChat Pay based on v3"
 keywords = ["alipay","wechat","v3"]
 repository = "https://github.com/jackieit/weapay"
-
+readme = "README.md"
+license = "MIT"
 [dependencies]
 aes = "0.8.4"
 cbc = "0.1.2"
