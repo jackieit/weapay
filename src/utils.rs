@@ -70,7 +70,7 @@ pub(crate) fn get_timestamp_millis() -> WeaResult<u128> {
 }
 // short for payerror
 pub(crate) fn e(message: &str) -> WeaError {
-    WeaError::new("".to_string(), message.to_string())
+    WeaError::new("", message.to_string())
 }
 // get cert serial number usedby wechat pay
 pub(crate) fn get_cert_serial(cert: &str) -> WeaResult<String> {

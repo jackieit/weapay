@@ -13,8 +13,8 @@ use std::time::SystemTimeError as TimeError;
 pub struct WeaError(String, String);
 
 impl WeaError {
-    pub fn new(kind: String, message: String) -> WeaError {
-        WeaError(kind, message)
+    pub fn new(kind: impl Into<String>, message: String) -> WeaError {
+        WeaError(kind.into(), message)
     }
 }
 impl fmt::Display for WeaError {
@@ -25,41 +25,41 @@ impl fmt::Display for WeaError {
 impl std::error::Error for WeaError {}
 impl From<IoError> for WeaError {
     fn from(err: IoError) -> Self {
-        WeaError::new("StdIo".to_string(), err.to_string())
+        WeaError::new("StdIo", err.to_string())
     }
 }
 impl From<Utf8Error> for WeaError {
     fn from(err: Utf8Error) -> Self {
-        WeaError::new("FromUtf8".to_string(), err.to_string())
+        WeaError::new("FromUtf8", err.to_string())
     }
 }
 impl From<TimeError> for WeaError {
     fn from(err: TimeError) -> Self {
-        WeaError::new("SystemTime".to_string(), err.to_string())
+        WeaError::new("SystemTime", err.to_string())
     }
 }
 impl From<JsonError> for WeaError {
     fn from(err: JsonError) -> Self {
-        WeaError::new("JsonConvert".to_string(), err.to_string())
+        WeaError::new("JsonConvert", err.to_string())
     }
 }
 impl From<HeaderError> for WeaError {
     fn from(err: HeaderError) -> Self {
-        WeaError::new("ReqwestHeader".to_string(), err.to_string())
+        WeaError::new("ReqwestHeader", err.to_string())
     }
 }
 impl From<ReqwestError> for WeaError {
     fn from(err: ReqwestError) -> Self {
-        WeaError::new("Reqwest".to_string(), err.to_string())
+        WeaError::new("Reqwest", err.to_string())
     }
 }
 impl From<OpensslError> for WeaError {
     fn from(err: OpensslError) -> Self {
-        WeaError::new("Openssl".to_string(), err.to_string())
+        WeaError::new("Openssl", err.to_string())
     }
 }
 impl From<AesError> for WeaError {
     fn from(err: AesError) -> Self {
-        WeaError::new("Aes".to_string(), err.to_string())
+        WeaError::new("Aes", err.to_string())
     }
 }
