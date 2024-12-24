@@ -11,12 +11,7 @@ wechat pay v3 and alipay v3 rust pay
 3. 如果无法接收到异步通知请检查是否配置了正确的异步通知地址及设置了APIv3 密钥
 支持微信支付和支付宝支付rust sdk，微信支付基于api v3
 包名称：weapay 意为 wechat pay & alipay
-# 微信签名验签
-1. 关于签名：微信支付签名规则参考[微信支付签名生成算法](https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_1.shtml)
-2. 关于验签：微信支付验签规则参考[微信支付验签](https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_2.shtml)
-注意微信支付验签时需要平台证书，平台证书下载地址[微信支付平台证书下载](https://pay.weixin.qq.com/wiki/doc/apiv3/wechatpay/wechatpay4_3.shtml)
-目前只能通过 api接口的方式下载平台证书，不支持手动下载，请保持 CARGO_MANIFEST_DIR/payment/certs/download 目录可写系统会每隔12小时自动下载平台证书
-3. 如果无法接收到异步通知请检查是否配置了正确的异步通知地址及设置了APIv3 密钥
+
 # 支付宝签名验签
 1. 关于签名：[支付宝支付签名生成算法](https://opendocs.alipay.com/open-v3/05419m?pathHash=a5cb620e)
 2. 关于验签：[v3同步验签](https://opendocs.alipay.com/open-v3/054d0z?pathHash=dcad8d5c)，异步难答验签请参考[异步通知验签](https://opendocs.alipay.com/open-v3/05pf4k?pathHash=01c6e762)
